@@ -1,6 +1,6 @@
 ## Purpose of the project
 
-The project aims to re-implement the architecture of **MinD-Video** described in the [research paper](https://proceedings.neurips.cc/paper_files/paper/2023/file/4e5e0daf4b05d8bfc6377f33fd53a8f4-Paper-Conference.pdf) for reconstructing high-quality videos from brain activity.
+The project aims to re-implement the architecture of **MinD-Video** described in this [research paper](https://proceedings.neurips.cc/paper_files/paper/2023/file/4e5e0daf4b05d8bfc6377f33fd53a8f4-Paper-Conference.pdf) for reconstructing high-quality videos from brain activity.
 
 ### Background
 
