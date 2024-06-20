@@ -18,10 +18,8 @@ Visual experiences are processed in the brain and can be measured through functi
 
 The project is organized to support efficient development and collaboration. The structure includes:
 
-- **`docs/`**: Documentation for understanding and using the project.
 - **`src/`**: Source code for data preprocessing, model implementation, training, and evaluation.
 - **`data/`**: Directories for raw and processed data.
-- **`experiments/`**: Separate directories for different experiments and results.
 - **`tests/`**: Scripts for testing various components of the system.
 - **`notebooks/`**: Jupyter notebooks for exploratory analysis and interactive development.
 
