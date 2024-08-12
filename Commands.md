@@ -39,7 +39,18 @@ This document provides instructions for setting up a neural network (NN) project
     pip freeze > requirements.txt
 
 ## 5. Install dependencies from requirements
-pip install -r requirements.txt
+    pip install -r requirements.txt
+
+## 6. Clone repository
+    git clone https://github.com/GabrieleLerani/NN-project
+    
+## 6. Install extensions on VSCode
+    Navigate to the extensions tab and install GitLens Jupyter Python extensions
+
+## 7. Set up GitLens
+    Navigate to the Source Control tab and create empty commit
+    Then commit and after that sync project
+
 
 
 
