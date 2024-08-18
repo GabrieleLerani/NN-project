@@ -19,3 +19,9 @@ dump:
   weights_path: "/Users/applem2/Downloads/NN/NN-project/results/checkpoints/weights"
   model_path: "/Users/applem2/Downloads/NN/NN-project/results/checkpoints/model"
 
+devices:
+  cuda: "cuda"
+  mps:  "mps"
+  tpu:  "tpu"
+  cpu:  "cpu"
+
