@@ -1,6 +1,21 @@
-epochs : 20
-learning_rate : 0.002
-batch_size : 10
-model_config :
+model:
   hidden_units : 64
   hidden_layers : 2
+
+train:
+  epochs : 20
+  learning_rate : 0.002
+  batch_size : 10
+
+test:
+  epochs : 20
+  learning_rate : 0.002
+  batch_size : 10
+
+data:
+  data_dir : "/Users/applem2/Downloads/NN/NN-project/data/datasets"
+
+dump:
+  weights_path: "/Users/applem2/Downloads/NN/NN-project/results/checkpoints/weights"
+  model_path: "/Users/applem2/Downloads/NN/NN-project/results/checkpoints/model"
+
