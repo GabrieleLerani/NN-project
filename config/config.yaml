@@ -1,0 +1,6 @@
+epochs : 20
+learning_rate : 0.002
+batch_size : 10
+model_config :
+  hidden_units : 64
+  hidden_layers : 2
