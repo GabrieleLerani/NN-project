@@ -9,7 +9,7 @@ from models import SFCNN
 class S4(nn.modules):
     def __init__(self, in_channels, out_channels):
         """
-        Method to init the S4 blocks
+        Method to init the S4 block
         """
         super().__init__()
 
