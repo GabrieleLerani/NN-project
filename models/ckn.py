@@ -11,6 +11,15 @@ class CKNN(nn.modules):
         Method to init the Continuous Kernel parameterized as a Continuous Kernel Neural Network
         """
         super().__init__()
+        self.flatten = nn.Flatten()
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(28 * 28, 512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, 10),
+            nn.Sigmoid(),
+        )
         raise NotImplementedError("No implemented yet")
 
     def forward(self, x):
