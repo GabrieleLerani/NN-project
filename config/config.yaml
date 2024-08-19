@@ -1,12 +1,15 @@
 model:
   hidden_units : 64
   hidden_layers : 2
-  optimizer: "adam"
-
+  
 train:
   epochs : 20
   learning_rate : 3e-4
   batch_size : 10
+  optimizer: "adamW"
+  dropout_rate: 10
+  weight_decay: 1e-4
+  w0: 20
 
 test:
   epochs : 20

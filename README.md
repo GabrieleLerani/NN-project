@@ -1,6 +1,6 @@
 ## Resources
 
-1. **ithub Original Repository**: 
+1. **Github Original Repository**: 
    
     https://github.com/david-knigge/ccnn
     
