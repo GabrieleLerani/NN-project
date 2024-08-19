@@ -6,7 +6,15 @@ from torch.utils.data import DataLoader
 
 class Trainer:
     def __init__(
-        self, model, loss_fn, optimizer, train_dataloader, val_dataloader, batch_size, learning_rate, device
+        self,
+        model,
+        loss,
+        optimizer,
+        train_dataloader,
+        val_dataloader,
+        batch_size,
+        learning_rate,
+        device,
     ):
         """
         Method to init the trainer setting all the parameters needed
@@ -17,33 +25,37 @@ class Trainer:
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.device = device
-        self.loss_fn = loss_fn
+        self.loss = loss
         self.optimizer = optimizer
-
-        pass
 
     def train(self, epochs):
         """
         Method to train the network on the training set
         """
+        self.model.train()
         for epoch in range(epochs):
             size = len(self.train_dataloader)
-            self.model.train()
-            loss = 0.0
-            for batch, (X, y) in enumerate(self.train_dataloader):
-                """ TODO
-                        pred = model(X)
-                    loss = loss_fn(pred, y)
+            for b, (X, y) in enumerate(self.train_dataloader):
 
-                    # Backpropagation
-                    loss.backward()
-                    optimizer.step()
-                    optimizer.zero_grad()
+                # computing prediction, forward step
+                pred = self.model(X)
 
-                    if batch % 100 == 0:
-                        loss, current = loss.item(), batch * batch_size + len(X)
-                        print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
-                """       
+                # computing loss
+                self.loss(pred, y)
+
+                # computing gradient of the loss, backward step
+                self.loss.backward()
+
+                # updating the model parameters
+                self.optimizer.step()
+
+                # reset gradient computational graph
+                self.optimizer.zero_grad()
+
+                if b % 100 == 0:
+                    loss, current = loss.item(), b * self.batch_size + len(X)
+                    print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+
         raise NotImplementedError("This function is not implemented yet")
 
     def validate(self):

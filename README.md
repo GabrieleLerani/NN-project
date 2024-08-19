@@ -1,10 +1,14 @@
-## Github repository
+## Resources
 
-https://github.com/david-knigge/ccnn
+1. **ithub Original Repository**: 
+   
+    https://github.com/david-knigge/ccnn
+    
+2. **Re cipe to build CNN**:  
+
+    https://karpathy.github.io/2019/04/25/recipe/
 
 ## Purpose of the project
-
-
 
 ### Background
 

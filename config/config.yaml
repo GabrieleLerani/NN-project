@@ -1,10 +1,11 @@
 model:
   hidden_units : 64
   hidden_layers : 2
+  optimizer: "adam"
 
 train:
   epochs : 20
-  learning_rate : 0.002
+  learning_rate : 3e-4
   batch_size : 10
 
 test:
