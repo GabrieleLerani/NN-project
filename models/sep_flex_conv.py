@@ -5,10 +5,10 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 
-class GPCNN(nn.modules):
+class SFCNN(nn.modules):
     def __init__(self):
         """
-        Method to init the General Purpose Convolutional Neural Network
+        Method to init the modified FlexConv layer, here is used the continuous kernel
         """
         raise NotImplementedError("No implemented yet")
 

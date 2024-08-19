@@ -8,7 +8,8 @@ from torchvision import datasets, transforms
 class CCNN(nn.modules):
     def __init__(self):
         """
-        Method to init the General Purpose Convolutional Neural Network
+        Method to init the General Purpose Convolutional Neural Network.
+        The model is used to perform spatial data classification
         """
         raise NotImplementedError("No implemented yet")
 
