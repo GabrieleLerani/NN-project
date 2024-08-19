@@ -4,11 +4,11 @@ import pandas as pd
 from torchvision import datasets, transforms
 
 
-class MnistLoader(Dataset):
+class STL10(Dataset):
 
     def __init__(self, data_dir, download, train, batch_size, shuffle, transform):
         """
-        Initialization method for the mnist dataset loader
+        Initialization method for the stl10 dataset loader
         """
         super.__init__()
         self.data_dir = data_dir
@@ -22,7 +22,7 @@ class MnistLoader(Dataset):
         """
         Download the dataset from the internet source
         """
-        self.dataset = datasets.MNIST(
+        self.dataset = datasets.stl10(
             root=self.data_dir,
             download=self.download,
             train=self.train,
