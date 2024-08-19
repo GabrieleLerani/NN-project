@@ -1,6 +1,14 @@
-model:
+cnn_4_110_model:
   hidden_units : 64
   hidden_layers : 2
+  blocks: 4
+  channels: 110
+
+cnn_6_380_model:
+  hidden_units : 64
+  hidden_layers : 2
+  blocks: 6
+  channels: 380
   
 train:
   epochs : 20
@@ -13,7 +21,6 @@ train:
 
 test:
   epochs : 20
-  learning_rate : 0.002
   batch_size : 10
 
 data:
