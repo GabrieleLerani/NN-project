@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
-from data import MnistLoader
+from data import Mnist
 
 
 class Loader:
@@ -32,7 +32,6 @@ class Loader:
             print(f"Shape of X: {X.shape}")
             print(f"Shape of y: {y.shape} {y.dtype}")
             break
-        raise NotImplementedError("This part is not implemented yet")
 
     def select_dataset_loader(
         self, dataset, data_dir, download, train, batch_size, shuffle, transform
@@ -47,7 +46,7 @@ class Loader:
             - modelnet
         """
         if dataset == "mnist":
-            dataset_loader = MnistLoader(
+            dataset_loader = Mnist(
                 data_dir=data_dir,
                 download=download,
                 train=train,

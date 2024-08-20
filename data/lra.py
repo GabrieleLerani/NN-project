@@ -1,4 +1,3 @@
-from datasets import load_dataset
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 from torchvision import datasets, transforms
@@ -12,7 +11,7 @@ class LRA(Dataset):
         """
         Initialization method for the long range arena dataset loader
         """
-        super.__init__()
+        super(LRA, self).__init__()
         self.dataset_name = dataset_name
         self.data_dir = data_dir
         self.download = download
@@ -25,7 +24,7 @@ class LRA(Dataset):
         """
         Download the dataset from the internet source
         """
-        self.dataset = load_dataset(self.dataset, split="train")
+        # self.dataset = load_dataset(self.dataset, split="train")
         return self.dataset
 
     def __len__(self):

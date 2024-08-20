@@ -1,8 +1,8 @@
 from torch import nn
-from models import SFCNN
+from models import SFC
 
 
-class ResS4Net(nn.modules):
+class ResS4Net(nn.Module):
     def __init__(self, L, in_channels, out_channels):
         """
         Method to init the residual network composed of x L S4 block
@@ -12,7 +12,7 @@ class ResS4Net(nn.modules):
         self.batch_norm_layer = nn.BatchNorm2d(num_features=in_channels)
 
         # separable flexible convolutional layer
-        self.sep_flex_conv_layer = SFCNN(
+        self.sep_flex_conv_layer = SFC(
             in_channels=in_channels, out_channels=out_channels
         )
 

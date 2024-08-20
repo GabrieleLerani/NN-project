@@ -1,13 +1,9 @@
-import os
-import torch
 from torch import nn
 import torch.nn.functional as f
-from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
 from models import AGL
 
 
-class KGN(nn.modules):
+class KGN(nn.Module):
     def __init__(self, out_channels, out_hidden, num_layers=3):
         """
         Method to init the Continuous Kernel parameterized as a Continuous Kernel Neural Network.
@@ -20,7 +16,7 @@ class KGN(nn.modules):
         self.out_channels = out_channels
         self.layers = nn.ModuleList()
 
-        self.layers.append(AGL(2, out_hidden))
+        self.layers.append(AGL(out_hidden))
 
         for l in range(1, num_layers):
             self.layers.append(nn.Linear(out_hidden, out_channels))

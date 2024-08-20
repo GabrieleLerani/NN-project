@@ -14,6 +14,7 @@ train:
   epochs : 20
   learning_rate : 3e-4
   batch_size : 10
+  loss_fn: "crossEntropy"
   optimizer: "adamW"
   dropout_rate: 10
   weight_decay: 1e-4

@@ -10,7 +10,7 @@ class CIFAR10(Dataset):
         """
         Initialization method for the cifar10 dataset loader
         """
-        super.__init__()
+        super(CIFAR10, self).__init__()
         self.data_dir = data_dir
         self.download = download
         self.train = train

@@ -10,7 +10,7 @@ class STL10(Dataset):
         """
         Initialization method for the stl10 dataset loader
         """
-        super.__init__()
+        super(STL10, self).__init__()
         self.data_dir = data_dir
         self.download = download
         self.train = train

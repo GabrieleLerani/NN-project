@@ -1,9 +1,10 @@
 from torch import nn
-from models import SFCNN, ResS4Net
+from models import SFC
+from models import ResS4Net
 
 
-class GPCNN(nn.modules):
-    def __init__(self, blocks, in_channels, out_channels, num_classes):
+class GPCNN(nn.Module):
+    def __init__(self, L, in_channels, out_channels, num_classes):
         """
         Method to init the General Purpose Convolutional Neural Network.
         The model is used to perform spatial data classification.
@@ -12,7 +13,7 @@ class GPCNN(nn.modules):
         super(GPCNN, self).__init__()
         # TODO parameters of the model
         # separable flexible convolutional layer
-        self.sep_flex_conv_layer = SFCNN(
+        self.sep_flex_conv_layer = SFC(
             in_channels=in_channels, out_channels=out_channels
         )
 
@@ -22,7 +23,7 @@ class GPCNN(nn.modules):
 
         # residual network, modification to the FlexNet architecture
         self.res_s4_net = ResS4Net(
-            blocks=blocks, in_channels=in_channels, out_channels=out_channels
+            L=L, in_channels=in_channels, out_channels=out_channels
         )
 
         self.batch_norm_layer_2 = nn.BatchNorm2d(num_features=out_channels)

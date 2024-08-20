@@ -13,7 +13,7 @@ class MFCC(Dataset):
         """
         Initialization method for the mfcc dataset loader
         """
-        super.__init__()
+        super(MFCC, self).__init__()
         self.data_dir = data_dir
         self.download = download
         self.subset = subset

@@ -10,13 +10,13 @@ class Mnist(Dataset):
         """
         Initialization method for the mnist dataset loader
         """
-        super.__init__()
+        super(Mnist, self).__init__()
         self.data_dir = data_dir
         self.download = download
         self.train = train
         self.batch_size = batch_size
         self.shuffle = shuffle
-        self.transorm = transform
+        self.transform = transform
 
     def fetch_dataset(self):
         """
