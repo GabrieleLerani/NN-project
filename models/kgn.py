@@ -1,33 +1,40 @@
 import os
 import torch
 from torch import nn
+import torch.nn.functional as f
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-from models import MAGNET
+from models import AGL
 
 
-class CKNN(nn.modules):
-    def __init__(self):
+class KGN(nn.modules):
+    def __init__(self, out_channels, out_hidden, num_layers=3):
         """
         Method to init the Continuous Kernel parameterized as a Continuous Kernel Neural Network.
         GKernel. Our kernel generator network is parameterized as a 3-layer MAGNet
         with 32 hidden units for the CCNN4,140 models, and 64 hidden units for the larger CCNN6,380 models.
         """
-        super().__init__()
-        self.flatten = nn.Flatten()
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(28 * 28, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Linear(512, 10),
-            nn.Sigmoid(),
-        )
-        self.magnets_layer = MAGNET()  # x 3 magnets layer
-        raise NotImplementedError("No implemented yet")
+        super(KGN, self).__init__()
 
-    def forward(self, x):
+        self.num_layers = num_layers
+        self.out_channels = out_channels
+        self.layers = nn.ModuleList()
+
+        self.layers.append(AGL(2, out_hidden))
+
+        for l in range(1, num_layers):
+            self.layers.append(nn.Linear(out_hidden, out_channels))
+
+        self.final_layer = nn.Linear(out_hidden, out_channels)
+
+    def forward(self, x, y):
         """
         Standard method of nn.modules
         """
-        raise NotImplementedError("No implemented yet")
+        x = self.layers[0](x, y)
+
+        for l in range(1, self.num_layers):
+            x = f.relu(self.layers[l](x))
+
+        x = self.final_layer(x)
+        return x
