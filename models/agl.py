@@ -24,11 +24,14 @@ class AGL(nn.Module):
         self.W = nn.Parameter(torch.randn(out_channels, 2))
         self.b = nn.Parameter(torch.randn(out_channels))
 
-    def forward(self, x, y):
+    def forward(self, x):
         """
         Standard method of nn.modules
         We implement the 2D gabor function in the paper
         """
+        # TODO correct 2D or 1D?
+        x = x[0:]
+        y = y[:0]
         shifted_x = x - self.mux
         shifted_y = y - self.muy
 

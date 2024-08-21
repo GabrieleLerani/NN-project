@@ -11,6 +11,7 @@ cnn_6_380_model:
   channels: 380
   
 train:
+  warm_up_epochs: 10
   epochs : 20
   learning_rate : 3e-4
   batch_size : 10

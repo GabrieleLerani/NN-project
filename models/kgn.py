@@ -1,10 +1,12 @@
-from torch import nn
+from torch import nn, sqrt, tensor
 import torch.nn.functional as f
 from models import AGL
 
 
 class KGN(nn.Module):
-    def __init__(self, out_channels, out_hidden, num_layers=3):
+    def __init__(
+        self, in_channels, out_channels, out_hidden, gain, kernel_size, N, num_layers=3
+    ):
         """
         Method to init the Continuous Kernel parameterized as a Continuous Kernel Neural Network.
         GKernel. Our kernel generator network is parameterized as a 3-layer MAGNet
@@ -12,6 +14,8 @@ class KGN(nn.Module):
         """
         super(KGN, self).__init__()
 
+        self.scaling_factor = gain / sqrt(tensor(in_channels * kernel_size))
+        self.N = N
         self.num_layers = num_layers
         self.out_channels = out_channels
         self.layers = nn.ModuleList()
@@ -21,16 +25,31 @@ class KGN(nn.Module):
         for l in range(1, num_layers):
             self.layers.append(nn.Linear(out_hidden, out_channels))
 
-        self.final_layer = nn.Linear(out_hidden, out_channels)
+        self.final_layer = nn.Linear(out_hidden, out_channels) * gain
 
-    def forward(self, x, y):
+    def forward(self, x):
         """
         Standard method of nn.modules
         """
-        x = self.layers[0](x, y)
+
+        # normalize coordinates
+        x = self.normalize_coordinates(x, self.N)
+        x = self.layers[0](x)
 
         for l in range(1, self.num_layers):
             x = f.relu(self.layers[l](x))
 
-        x = self.final_layer(x)
+        x = self.reweight_final_layer(self.final_layer(x))
         return x
+
+    def reweight_final_layer(self, x):
+        """
+        Method to reweight the last layer to avoid problems like vanishing or exploding gradients
+        """
+        return x * self.scaling_factor
+
+    def normalize_coordinates(self, p, N):
+        """
+        Method to normalize coordinates given to the GKernel network in input to speed up
+        """
+        return 2 * (p / N) - 1
