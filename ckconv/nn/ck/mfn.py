@@ -2,13 +2,10 @@ from torch import nn, sqrt, tensor
 from ck import GetLinear
 import torch
 
+
 class MFN(nn.Module):
     def __init__(
-        self, 
-        data_dim: int,
-        hidden_channels: int,
-        out_channels: int,
-        no_layers: int
+        self, data_dim: int, hidden_channels: int, out_channels: int, no_layers: int
     ):
         """
         Initializes an instance of the MFN class.
@@ -21,8 +18,7 @@ class MFN(nn.Module):
             None
         """
         super(MFN, self).__init__()
-        
-        
+
         # hidden layers
         self.linearLayer = nn.ModuleList(
             [
@@ -31,7 +27,7 @@ class MFN(nn.Module):
                     in_channels=hidden_channels,
                     out_channels=hidden_channels,
                     stride=1,
-                    bias=True
+                    bias=True,
                 )
                 for _ in range(no_layers)
             ]
@@ -44,35 +40,32 @@ class MFN(nn.Module):
                 in_channels=hidden_channels,
                 out_channels=out_channels,
                 stride=1,
-                bias=True
+                bias=True,
             )
         )
 
-
-        
     def forward(self, x):
         """
         TODO
         """
         h = self.gabor_filters[0](x)
         for l in range(1, len(self.gabor_filters)):
-            h = self.gabor_filters[l](x) * self.linearLayer[l-1](h)
+            h = self.gabor_filters[l](x) * self.linearLayer[l - 1](h)
 
         last = self.linearLayer[-1](h)
 
         return last
-    
 
 
 class GaborNet(MFN):
     def __init__(
-            self, 
-            data_dim: int,
-            hidden_channels: int,
-            out_channels: int,
-            no_layers: int,
-            alpha: float = 6.0,
-            beta: float = 1.0,
+        self,
+        data_dim: int,
+        hidden_channels: int,
+        out_channels: int,
+        no_layers: int,
+        alpha: float = 6.0,
+        beta: float = 1.0,
     ):
         """
         TODO
@@ -84,21 +77,20 @@ class GaborNet(MFN):
                     data_dim=data_dim,
                     hidden_channels=hidden_channels,
                     current_layer=l,
-                ) 
+                )
                 for l in range(no_layers)
             ]
         )
 
-    
-    
+
 class GaborLayer(nn.Module):
     def __init__(
-            self,
-            data_dim: int,
-            hidden_channels: int,
-            current_layer: int,
-            alpha: float = 6.0,
-            beta: float = 1.0
+        self,
+        data_dim: int,
+        hidden_channels: int,
+        current_layer: int,
+        alpha: float = 6.0,
+        beta: float = 1.0,
     ):
         super().__init__()
 
@@ -108,12 +100,16 @@ class GaborLayer(nn.Module):
             in_channels=data_dim,
             out_channels=hidden_channels,
             stride=1,
-            bias=True
+            bias=True,
         )
 
-        self.gamma_x = torch.distributions.gamma.Gamma(alpha / current_layer, beta).sample(hidden_channels)
-        self.gamma_y = torch.distributions.gamma.Gamma(alpha / current_layer, beta).sample(hidden_channels)
-        
+        self.gamma_x = torch.distributions.gamma.Gamma(
+            alpha / current_layer, beta
+        ).sample(hidden_channels)
+        self.gamma_y = torch.distributions.gamma.Gamma(
+            alpha / current_layer, beta
+        ).sample(hidden_channels)
+
         # init the gamma_x and gamma_y parameters for the scaling factor for the horizontal and vertical directions
         # self.gammax = nn.Parameter(torch.randn(out_channels, 1))
         # self.gammay = nn.Parameter(torch.randn(out_channels, 1))
@@ -130,9 +126,12 @@ class GaborLayer(nn.Module):
         """
         Standard method of nn.modules
         We implement the 2D gabor function in the paper
+        We assume the input is x of shape [x,y]
+        gamma of shape : [gammax,gammay]
+        mu of shape :
         """
-        # TODO correct 2D or 1D?
-        x = x[0:]
+        #
+        """ x = x[0:]
         y = y[:0]
         shifted_x = x - self.mux
         shifted_y = y - self.muy
@@ -146,9 +145,17 @@ class GaborLayer(nn.Module):
         # computing the gaussian envelope
         g_exp_envelope = torch.exp(
             -0.5 * ((shifted_scaled_x**2) + (shifted_scaled_y**2))
+        ) """
+
+        g_envelope = torch.exp(
+            -0.5
+            * (
+                (self.gamma_x * (x[:, 0] - self.mu_x)) ** 2
+                + (self.gamma_y * (x[:1] - self.mu_y)) ** 2
+            )
         )
 
         # computing the sinusoidal
         sinusoidal = torch.sin((torch.matmul(self.W, xy) + self.b))
 
-        return g_exp_envelope * sinusoidal
+        return g_envelope * sinusoidal
