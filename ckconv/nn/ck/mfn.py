@@ -123,9 +123,10 @@ class GaborLayer(nn.Module):
         self.mi_x = torch.distributions.normal.Normal.sample(hidden_channels)
         self.mi_y = torch.distributions.normal.Normal.sample(hidden_channels)
 
-        # # init the frequency components W_g for the orientation and frequency of sinusoidal and b for phase offset
-        # self.W = nn.Parameter(torch.randn(out_channels, 2))
-        # self.b = nn.Parameter(torch.randn(out_channels))
+        # init the frequency components W_g for the orientation and frequency of sinusoidal and b for phase offset
+
+        torch.nn.init.normal_(self.linear.weigth, mean=0.0, std=0.01)
+        torch.nn.init.normal_(self.linear.bias, self.b_g, 0.0)
 
     def forward(self, x):
         """
