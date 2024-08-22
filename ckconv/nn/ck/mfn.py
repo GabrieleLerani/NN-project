@@ -94,6 +94,15 @@ class GaborLayer(nn.Module):
     ):
         super().__init__()
 
+        """
+        TODO check the number of linear and gabor layers (one is L+1, the other one is L)
+        """
+
+        """
+        TODO self.linear(x) in the sine of the forward function assumes an input size of 2 x Nhid
+        while self.linear has data_dim has input size (presumably 2)i
+        """
+
         # linear layer
         self.linear = GetLinear(
             dim=data_dim,
@@ -110,13 +119,9 @@ class GaborLayer(nn.Module):
             alpha / current_layer, beta
         ).sample(hidden_channels)
 
-        # init the gamma_x and gamma_y parameters for the scaling factor for the horizontal and vertical directions
-        # self.gammax = nn.Parameter(torch.randn(out_channels, 1))
-        # self.gammay = nn.Parameter(torch.randn(out_channels, 1))
-
-        # # init the mu_x and mu_y parameters for the mean of the Gabor Function for the horizontal and vertical directions
-        # self.mux = nn.Parameter(torch.randn(out_channels, 1))
-        # self.muy = nn.Parameter(torch.randn(out_channels, 1))
+        # they are initialized according to normal distribution
+        self.mi_x = torch.distributions.normal.Normal.sample(hidden_channels)
+        self.mi_y = torch.distributions.normal.Normal.sample(hidden_channels)
 
         # # init the frequency components W_g for the orientation and frequency of sinusoidal and b for phase offset
         # self.W = nn.Parameter(torch.randn(out_channels, 2))
@@ -127,25 +132,7 @@ class GaborLayer(nn.Module):
         Standard method of nn.modules
         We implement the 2D gabor function in the paper
         We assume the input is x of shape [x,y]
-        gamma of shape : [gammax,gammay]
-        mu of shape :
         """
-        #
-        """ x = x[0:]
-        y = y[:0]
-        shifted_x = x - self.mux
-        shifted_y = y - self.muy
-
-        shifted_scaled_x = shifted_x * self.gammax
-        shifted_scaled_y = shifted_y * self.gammay
-
-        # we compute [x,y] vector
-        xy = torch.cat((x, y), dim=0)
-
-        # computing the gaussian envelope
-        g_exp_envelope = torch.exp(
-            -0.5 * ((shifted_scaled_x**2) + (shifted_scaled_y**2))
-        ) """
 
         g_envelope = torch.exp(
             -0.5
@@ -156,6 +143,6 @@ class GaborLayer(nn.Module):
         )
 
         # computing the sinusoidal
-        sinusoidal = torch.sin((torch.matmul(self.W, xy) + self.b))
+        sinusoidal = torch.sin(self.linear(x))
 
         return g_envelope * sinusoidal
