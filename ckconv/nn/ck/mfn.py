@@ -102,6 +102,15 @@ class GaborLayer(nn.Module):
     ):
         super().__init__()
 
+        """
+        TODO check the number of linear and gabor layers (one is L+1, the other one is L)
+        """
+
+        """
+        TODO self.linear(x) in the sine of the forward function assumes an input size of 2 x Nhid
+        while self.linear has data_dim has input size (presumably 2)i
+        """
+
         # linear layer
         self.linear = GetLinear(
             dim=data_dim,
@@ -113,6 +122,10 @@ class GaborLayer(nn.Module):
 
         self.gamma_x = torch.distributions.gamma.Gamma(alpha / current_layer, beta).sample(hidden_channels)
         self.gamma_y = torch.distributions.gamma.Gamma(alpha / current_layer, beta).sample(hidden_channels)
+
+        # they are initialized according to normal distribution
+        self.mi_x = torch.distributions.normal.Normal.sample(hidden_channels)
+        self.mi_y = torch.distributions.normal.Normal.sample(hidden_channels)
         
         # init the gamma_x and gamma_y parameters for the scaling factor for the horizontal and vertical directions
         # self.gammax = nn.Parameter(torch.randn(out_channels, 1))
@@ -131,17 +144,18 @@ class GaborLayer(nn.Module):
         Standard method of nn.modules
         We implement the 2D gabor function in the paper
         """
-        # TODO correct 2D or 1D?
-        x = x[0:]
-        y = y[:0]
-        shifted_x = x - self.mux
-        shifted_y = y - self.muy
 
-        shifted_scaled_x = shifted_x * self.gammax
-        shifted_scaled_y = shifted_y * self.gammay
+        """
+        TODO
+        We assumed that x is a matrix 2 x Nhid
+        So we split it into two vectors of size Nhid
+        """
 
-        # we compute [x,y] vector
-        xy = torch.cat((x, y), dim=0)
+        shifted_x = x[0] - self.mi_x
+        shifted_y = x[1] - self.mi_y
+
+        shifted_scaled_x = shifted_x * self.gamma_x
+        shifted_scaled_y = shifted_y * self.gamma_y
 
         # computing the gaussian envelope
         g_exp_envelope = torch.exp(
@@ -149,6 +163,6 @@ class GaborLayer(nn.Module):
         )
 
         # computing the sinusoidal
-        sinusoidal = torch.sin((torch.matmul(self.W, xy) + self.b))
+        sinusoidal = torch.sin(self.linear(x))
 
         return g_exp_envelope * sinusoidal
