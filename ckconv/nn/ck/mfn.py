@@ -138,7 +138,7 @@ class GaborLayer(nn.Module):
             -0.5
             * (
                 (self.gamma_x * (x[:, 0] - self.mu_x)) ** 2
-                + (self.gamma_y * (x[:1] - self.mu_y)) ** 2
+                + (self.gamma_y * (x[:, 1] - self.mu_y)) ** 2
             )
         )
 
