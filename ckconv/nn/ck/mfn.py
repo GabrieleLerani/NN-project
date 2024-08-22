@@ -100,7 +100,7 @@ class GaborLayer(nn.Module):
 
         """
         TODO self.linear(x) in the sine of the forward function assumes an input size of 2 x Nhid
-        while self.linear has data_dim has input size (presumably 2)i
+        while self.linear has data_dim has input size (presumably 2)
         """
 
         # linear layer
@@ -125,8 +125,8 @@ class GaborLayer(nn.Module):
 
         # init the frequency components W_g for the orientation and frequency of sinusoidal and b for phase offset
 
-        torch.nn.init.normal_(self.linear.weigth, mean=0.0, std=0.01)
-        torch.nn.init.normal_(self.linear.bias, 0.0)
+        torch.nn.init.normal_(self.linear.weigth, mean=0.0, std=1.0)
+        torch.nn.init.normal_(self.linear.bias, mean=0.0, std=1.0)
 
     def forward(self, x):
         """
@@ -138,8 +138,8 @@ class GaborLayer(nn.Module):
         g_envelope = torch.exp(
             -0.5
             * (
-                (self.gamma_x * (x[:, 0] - self.mu_x)) ** 2
-                + (self.gamma_y * (x[:, 1] - self.mu_y)) ** 2
+                (self.gamma_x * (x[:, 0] - self.mi_x)) ** 2
+                + (self.gamma_y * (x[:, 1] - self.mi_y)) ** 2
             )
         )
 
