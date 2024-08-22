@@ -15,7 +15,7 @@ if __name__ == "__main__":
         else (
             params["devices"]["mps"]
             if torch.backends.mps.is_available()
-            else params["devices"]["cuda"]
+            else params["devices"]["cpu"]
         )
     )
     print(f"----- Using {device} device -----")
