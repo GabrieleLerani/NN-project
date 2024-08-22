@@ -3,14 +3,14 @@ from models import SFC
 from models import ResS4Net
 
 
-class GPCNN(nn.Module):
+class CCNN(nn.Module):
     def __init__(self, L, in_channels, out_channels, num_classes):
         """
         Method to init the General Purpose Convolutional Neural Network.
         The model is used to perform spatial data classification.
         The network can be constructed with different block number and channel number.
         """
-        super(GPCNN, self).__init__()
+        super(CCNN, self).__init__()
         # TODO parameters of the model
         # separable flexible convolutional layer
         self.sep_flex_conv_layer = SFC(

@@ -1,0 +1,14 @@
+h5py
+matplotlib
+torchaudio
+scikit-learn
+torch
+torchvision
+torchtext
+plotly
+torch-geometric
+hydra-core
+wandb
+datasets
+pytorch-lightning
+torchmetrics

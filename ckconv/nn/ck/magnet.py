@@ -3,7 +3,7 @@ import torch.nn.functional as f
 from models import AGL
 
 
-class KGN(nn.Module):
+class Magnet(nn.Module):
     def __init__(
         self, in_channels, out_channels, out_hidden, gain, kernel_size, N, num_layers=3
     ):
@@ -12,7 +12,7 @@ class KGN(nn.Module):
         GKernel. Our kernel generator network is parameterized as a 3-layer MAGNet
         with 32 hidden units for the CCNN4,140 models, and 64 hidden units for the larger CCNN6,380 models.
         """
-        super(KGN, self).__init__()
+        super(Magnet, self).__init__()
 
         self.scaling_factor = gain / sqrt(tensor(in_channels * kernel_size))
         self.N = N

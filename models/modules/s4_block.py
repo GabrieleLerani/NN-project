@@ -2,12 +2,12 @@ from torch import nn
 from models import SFC
 
 
-class ResS4Net(nn.Module):
+class S4Block(nn.Module):
     def __init__(self, L, in_channels, out_channels):
         """
         Method to init the residual network composed of x L S4 block
         """
-        super(ResS4Net, self).__init__()
+        super(S4Block, self).__init__()
 
         self.batch_norm_layer = nn.BatchNorm2d(num_features=in_channels)
 
