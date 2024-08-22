@@ -132,7 +132,7 @@ class GaborLayer(nn.Module):
         """
         Standard method of nn.modules
         We implement the 2D gabor function in the paper
-        We assume the input is x of shape [x,y]
+        We assume the input is x of shape [batch_size,2]
         """
 
         g_envelope = torch.exp(
