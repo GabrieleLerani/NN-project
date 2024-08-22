@@ -1,1 +1,1 @@
-from ck import GetLinear
+from .linear import GetLinear
