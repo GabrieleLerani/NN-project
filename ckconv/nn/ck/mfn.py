@@ -126,7 +126,7 @@ class GaborLayer(nn.Module):
         # init the frequency components W_g for the orientation and frequency of sinusoidal and b for phase offset
 
         torch.nn.init.normal_(self.linear.weigth, mean=0.0, std=0.01)
-        torch.nn.init.normal_(self.linear.bias, self.b_g, 0.0)
+        torch.nn.init.normal_(self.linear.bias, 0.0)
 
     def forward(self, x):
         """
