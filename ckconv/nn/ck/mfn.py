@@ -29,7 +29,7 @@ class MFN(nn.Module):
                     stride=1,
                     bias=True,
                 )
-                for _ in range(no_layers)
+                for _ in range(no_layers - 1)
             ]
         )
 
@@ -57,15 +57,13 @@ class MFN(nn.Module):
         return last
 
 
-class GaborNet(MFN):
+class MAGNet(MFN):
     def __init__(
         self,
         data_dim: int,
         hidden_channels: int,
         out_channels: int,
-        no_layers: int,
-        alpha: float = 6.0,
-        beta: float = 1.0,
+        no_layers: int
     ):
         """
         TODO
@@ -73,7 +71,7 @@ class GaborNet(MFN):
         super().__init__(data_dim, hidden_channels, out_channels, no_layers)
         self.gabor_filters = nn.ModuleList(
             [
-                GaborLayer(
+                AnisotropicGaborLayer(
                     data_dim=data_dim,
                     hidden_channels=hidden_channels,
                     current_layer=l,
@@ -83,7 +81,7 @@ class GaborNet(MFN):
         )
 
 
-class GaborLayer(nn.Module):
+class AnisotropicGaborLayer(nn.Module):
     def __init__(
         self,
         data_dim: int,
@@ -93,10 +91,6 @@ class GaborLayer(nn.Module):
         beta: float = 1.0,
     ):
         super().__init__()
-
-        """
-        TODO check the number of linear and gabor layers (one is L+1, the other one is L)
-        """
 
         """
         TODO self.linear(x) in the sine of the forward function assumes an input size of 2 x Nhid
@@ -112,21 +106,28 @@ class GaborLayer(nn.Module):
             bias=True,
         )
 
-        self.gamma_x = torch.distributions.gamma.Gamma(
-            alpha / current_layer, beta
-        ).sample(hidden_channels)
-        self.gamma_y = torch.distributions.gamma.Gamma(
-            alpha / current_layer, beta
-        ).sample(hidden_channels)
+        self.gamma_x = nn.parameter.Parameter(
+            torch.distributions.gamma.Gamma(
+                alpha / current_layer, beta
+            ).sample(hidden_channels)
+        )
+        self.gamma_y = nn.parameter.Parameter(
+            torch.distributions.gamma.Gamma(
+                alpha / current_layer, beta
+            ).sample(hidden_channels)
+        )
 
         # they are initialized according to normal distribution
-        self.mi_x = torch.distributions.normal.Normal.sample(hidden_channels)
-        self.mi_y = torch.distributions.normal.Normal.sample(hidden_channels)
+        self.mi_x = nn.parameter.Parameter(torch.distributions.normal.Normal.sample(hidden_channels))
+        self.mi_y = nn.parameter.Parameter(torch.distributions.normal.Normal.sample(hidden_channels))
 
         # init the frequency components W_g for the orientation and frequency of sinusoidal and b for phase offset
 
-        torch.nn.init.normal_(self.linear.weigth, mean=0.0, std=1.0)
-        torch.nn.init.normal_(self.linear.bias, mean=0.0, std=1.0)
+        self.linear.weight = nn.Parameter(torch.randn(data_dim, hidden_channels))
+        self.linear.bias = nn.Parameter(torch.randn(hidden_channels))
+
+        # torch.nn.init.normal_(self.linear.weigth, mean=0.0, std=1.0)
+        # torch.nn.init.normal_(self.linear.bias, mean=0.0, std=1.0)
 
     def forward(self, x):
         """
