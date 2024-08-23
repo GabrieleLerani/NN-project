@@ -1,5 +1,6 @@
 from torch import nn
 from linear import GetLinear
+from grid import linspace_grid
 import torch
 
 
@@ -105,9 +106,7 @@ class AnisotropicGaborLayer(nn.Module):
         )
 
     
-        gamma_dist = torch.distributions.gamma.Gamma(alpha / (current_layer + 1), beta).sample(
-                (hidden_channels, 1)
-            )
+        gamma_dist = torch.distributions.gamma.Gamma(alpha / (current_layer + 1), beta)
 
         self.gamma = nn.ParameterList([
             nn.Parameter(gamma_dist.sample(
@@ -115,9 +114,7 @@ class AnisotropicGaborLayer(nn.Module):
             )) for _ in range(data_dim)
         ])
 
-        normal_dist = torch.distributions.normal.Normal( # TODO
-            0, 1
-        )
+        normal_dist = torch.distributions.normal.Normal( 0, 1)
 
         self.mi = nn.ParameterList([
             nn.Parameter(normal_dist.sample((hidden_channels,1))) for _ in range(data_dim)
@@ -139,7 +136,7 @@ class AnisotropicGaborLayer(nn.Module):
 
     def forward(self, x):
         """
-        
+        TODO
         """
         
     
@@ -174,16 +171,7 @@ class AnisotropicGaborLayer(nn.Module):
 
         return g_envelope * sinusoidal
 
-# TODO move in a separate file
-def linspace_grid(grid_sizes):
-    """Generates a flattened grid of (x,y,...) coordinates in a range of -1 to 1."""
-    tensors = []
-    for size in grid_sizes:
-        tensors.append(torch.arange(size).float())
 
-    grid = torch.stack(torch.meshgrid(*tensors), dim=0)
-
-    return grid
 
 
 if __name__ == "__main__":
@@ -193,7 +181,7 @@ if __name__ == "__main__":
 
     x = linspace_grid(
         [
-            2,
+            3,
         ]
         * data_dim
     ).unsqueeze(0)
