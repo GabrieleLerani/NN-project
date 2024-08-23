@@ -30,8 +30,27 @@ class CKConv(nn.Module):
         self.kernel_positions = torch.zeros(1)
         
 
-    
-    def GetRelPositions(self, x):
+    def construct_masked_kernel(self, x):
+        """
+        TODO
+        """
+
+        # 1. Get the relative positions
+        kernel_positions = self.get_rel_positions(x)
+
+        # 2. Get the kernel
+        conv_kernel = self.KernelNet(kernel_positions)
+
+        # 3. Construct the masked
+        mask = self.gaussian_mask(
+            kernel_pos=kernel_positions,
+            mask_mean_param=self.mask_mean_param, # TODO check mask_mean_param
+            mask_width_param=self.mask_width_param,
+        )
+
+        return conv_kernel * mask
+
+    def get_rel_positions(self, x):
         """
         Handles the vector or relative positions which is given to KernelNet.
         """
@@ -56,9 +75,10 @@ class CKConv(nn.Module):
 
             # Save the step size for the calculation of dynamic cropping
             # The step is max - min / (no_steps - 1)
-            self.linspace_stepsize = (
-                (1.0 - (-1.0)) / (self.train_length[0] - 1)
-            ).type_as(self.linspace_stepsize)
+            # TODO : Check cropping
+            # self.linspace_stepsize = (
+            #     (1.0 - (-1.0)) / (self.train_length[0] - 1)
+            # ).type_as(self.linspace_stepsize)
         return self.kernel_positions
 
     
@@ -77,6 +97,18 @@ class CKConv(nn.Module):
                 1, keepdim=True
             )
         )
+
+    def forward(self,x):
+        """
+        TODO
+        """
+        # TODO dimensions of x and kernel
+
+        conv_kernel = self.construct_masked_kernel(x)
+
+        # TODO fft
+
+        return x
 
 
 
