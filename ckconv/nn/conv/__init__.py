@@ -1,1 +1,1 @@
-from .fourier_conv import fftconv
+from .conv import fftconv, conv

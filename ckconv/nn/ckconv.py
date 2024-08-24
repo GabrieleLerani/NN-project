@@ -1,7 +1,9 @@
 from torch import nn
 from ck import MAGNet
 from ck import linspace_grid
+from ck import GetLinear
 from conv import fftconv
+from conv import conv as simple_conv
 import torch
 
 
@@ -9,26 +11,45 @@ class CKConv(nn.Module):
     def __init__(
         self,
         data_dim: int,
-        hidden_channels: int,
+        in_channels: int,
         out_channels: int,
+        hidden_channels: int,
         no_layers: int,
         kernel_size: int = 33,
+        conv_type: str = "conv",
+        fft_thresold: int = 50,
+        bias: bool = False, 
     ):
         """
         TODO
         """
         super().__init__()
 
+        self.conv_type = conv_type
+        self.fft_thresold = fft_thresold
+
+        # Define the kernel net, in our case always a MAGNet
         self.KernelNet = MAGNet(
             data_dim=data_dim,
             hidden_channels=hidden_channels,
             out_channels=out_channels,
             no_layers=no_layers,
         )
+        
+        # Define the pointwise convolution (page 4 original paper)
+        self.pointwise_conv = GetLinear(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            bias=bias,
+        )
 
+        # Define the mask parameters
         self.kernel_size = kernel_size
+
+        # Relative positions of the kernel
         self.kernel_positions = torch.zeros(1)
 
+    
         self.bias = torch.randn(hidden_channels)
 
     def construct_masked_kernel(self, x):
@@ -42,7 +63,7 @@ class CKConv(nn.Module):
         # 2. Get the kernel
         conv_kernel = self.KernelNet(kernel_positions)
 
-        # 3. Get the mask
+        # 3. Get the mask CHECK THE GAUSSIAN MASK
         mask = self.gaussian_mask(
             kernel_pos=kernel_positions,
             mask_mean_param=self.mask_mean_param,  # TODO check mask_mean_param
@@ -103,14 +124,17 @@ class CKConv(nn.Module):
 
         conv_kernel = self.construct_masked_kernel(x)
 
-        # TODO check fft and bias
+        size = torch.tensor(conv_kernel.shape[2:]) # -> [33,33] for data_dim=2
+        # fftconv is used when the size of the kernel is large enough
+        if self.conv_type == "fftconv" and torch.all(size > self.fft_thresold):
+            out = fftconv(x=x, kernel=conv_kernel, bias=self.bias)
+        else:
+            out = simple_conv(x=x, kernel=conv_kernel, bias=self.bias)
 
-        # general dim depth-wise fft convolution
-        convFft = fftconv(x=x, kernel=conv_kernel, bias=self.bias)
-
-        # TODO general convolution ex:conv_2d pointwise convolution
-        out = None
-
+        # pointwise convolution where out is the spatial convolution
+        out = self.pointwise_conv(out)
+        
+        
         return out
 
 
