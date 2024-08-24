@@ -45,6 +45,19 @@ class MFN(nn.Module):
             )
         )
 
+    def re_weight_output_layer(self, factor: float):
+        """
+        Re-weights the last layer of the kernel net by factor = gain / sqrt(in_channels * kernel_size).
+        Args:
+            gain (float): The gain to re-weight the last layer by.
+        Returns:
+            None
+        """
+        # get the last layer and re-weight it
+        self.linearLayer[-1].weight.data *= factor 
+                                                       
+
+
     def forward(self, x):
         """
         TODO
@@ -107,6 +120,7 @@ class AnisotropicGaborLayer(nn.Module):
 
         gamma_dist = torch.distributions.gamma.Gamma(alpha / (current_layer + 1), beta)
 
+        # generate as gamma_dist as data_dim (gamma_x, gamma_y, ...)
         self.gamma = nn.ParameterList(
             [
                 nn.Parameter(gamma_dist.sample((hidden_channels, 1)))
@@ -116,6 +130,7 @@ class AnisotropicGaborLayer(nn.Module):
 
         normal_dist = torch.distributions.normal.Normal(0, 1)
 
+        # generate as many mi as data_dim (mi_x, mi_y, ...)
         self.mi = nn.ParameterList(
             [
                 nn.Parameter(normal_dist.sample((hidden_channels, 1)))
@@ -151,7 +166,9 @@ class AnisotropicGaborLayer(nn.Module):
         reshaped_gamma = [
             g.view(1, *g.shape, *((1,) * (self.data_dim))) for g in self.gamma
         ]
+
         reshaped_mi = [m.view(1, *m.shape, *((1,) * (self.data_dim))) for m in self.mi]
+        # -> [1, hidden_channels, 1, 1, 1] if data_dim = 2
 
         g_envelopes = []
         for i in range(self.data_dim):

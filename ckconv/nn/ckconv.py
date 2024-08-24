@@ -1,10 +1,12 @@
+import math
+import torch
 from torch import nn
 from ck import MAGNet
 from ck import linspace_grid
 from ck import GetLinear
 from conv import fftconv
 from conv import conv as simple_conv
-import torch
+
 
 
 class CKConv(nn.Module):
@@ -43,14 +45,18 @@ class CKConv(nn.Module):
             bias=bias,
         )
 
-        # Define the mask parameters
+        
         self.kernel_size = kernel_size
 
-        # Relative positions of the kernel
+        # init relative positions of the kernel
         self.kernel_positions = torch.zeros(1)
 
-    
+        # init random bias with hidden_channels dimensions
         self.bias = torch.randn(hidden_channels)
+
+        # store variables
+        self.data_dim = data_dim
+        self.in_channels = in_channels
 
     def construct_masked_kernel(self, x):
         """
@@ -59,6 +65,17 @@ class CKConv(nn.Module):
 
         # 1. Get the relative positions
         kernel_positions = self.get_rel_positions(x)
+
+        # Re weight the last layer of the kernel net
+        kernel_size = kernel_positions.shape[data_dim:].prod().item() 
+        # [1, 2, 33, 33] -> [33,33] for data_dim=2
+        # prod multiplies all elements in the tensor i.e. 33*33 = 1089
+        # item converts the tensor to a python number
+        
+        # define gain / sqrt(in_channels * kernel_size) by Chang et al. (2020)
+        factor = 1.0 / math.sqrt(self.in_channels * kernel_size)
+
+        self.KernelNet.re_weight_output_layer(factor)
 
         # 2. Get the kernel
         conv_kernel = self.KernelNet(kernel_positions)
