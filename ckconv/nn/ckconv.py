@@ -107,7 +107,9 @@ class CKConv(nn.Module):
 
         convFft = fftconv(x=x, kernel=conv_kernel, bias=self.bias)
 
-        return convFft
+        res_x = x + convFft
+
+        return res_x
 
 
 if __name__ == "__main__":
