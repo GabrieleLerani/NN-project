@@ -1,6 +1,6 @@
 from torch import nn
-from linear import GetLinear
-from grid import linspace_grid
+from ck import GetLinear
+from ck import linspace_grid
 import torch
 
 
@@ -105,22 +105,25 @@ class AnisotropicGaborLayer(nn.Module):
             bias=True,
         )
 
-    
         gamma_dist = torch.distributions.gamma.Gamma(alpha / (current_layer + 1), beta)
 
-        self.gamma = nn.ParameterList([
-            nn.Parameter(gamma_dist.sample(
-                (hidden_channels, 1)
-            )) for _ in range(data_dim)
-        ])
+        self.gamma = nn.ParameterList(
+            [
+                nn.Parameter(gamma_dist.sample((hidden_channels, 1)))
+                for _ in range(data_dim)
+            ]
+        )
 
-        normal_dist = torch.distributions.normal.Normal( 0, 1)
+        normal_dist = torch.distributions.normal.Normal(0, 1)
 
-        self.mi = nn.ParameterList([
-            nn.Parameter(normal_dist.sample((hidden_channels,1))) for _ in range(data_dim)
-        ])
-        
-        # TODO init weights and biases    
+        self.mi = nn.ParameterList(
+            [
+                nn.Parameter(normal_dist.sample((hidden_channels, 1)))
+                for _ in range(data_dim)
+            ]
+        )
+
+        # TODO init weights and biases
         # init the frequency components W_g for the orientation and frequency of sinusoidal and b for phase offset
 
         # self.linear.weight.data = nn.Parameter(torch.randn(hidden_channels,data_dim,1,1))
@@ -138,33 +141,32 @@ class AnisotropicGaborLayer(nn.Module):
         """
         TODO
         """
-        
-    
+
         # coordinates (x,y,...)
-        coord = [ x[0][i] for i in range(self.data_dim)]
+        coord = [x[0][i] for i in range(self.data_dim)]
 
         # reshaping the parameters
-        reshaped_coord = [ c.view(1,1,1,*c.shape) for c in coord]
+        reshaped_coord = [c.view(1, 1, 1, *c.shape) for c in coord]
 
-        reshaped_gamma = [g.view(1, *g.shape, *((1,) * (self.data_dim)))  for g in self.gamma]
-        reshaped_mi = [m.view(1, *m.shape, *((1,) * (self.data_dim)))  for m in self.mi]
-
+        reshaped_gamma = [
+            g.view(1, *g.shape, *((1,) * (self.data_dim))) for g in self.gamma
+        ]
+        reshaped_mi = [m.view(1, *m.shape, *((1,) * (self.data_dim))) for m in self.mi]
 
         g_envelopes = []
-        for i in range(data_dim):
+        for i in range(self.data_dim):
             g_envelope = torch.exp(
                 -0.5 * (reshaped_gamma[i] * (reshaped_coord[i] - reshaped_mi[i])) ** 2
             )  # Shape: [1, hidden_channels, 20, 20]
             g_envelopes.append(g_envelope)
-        
+
         # Multiply all the envelopes together
         g_envelope = g_envelopes[0]
-        for i in range(1, data_dim):
+        for i in range(1, self.data_dim):
             g_envelope *= g_envelopes[i]
-        
+
         # Squeeze the third dimension
         g_envelope = g_envelope.squeeze(2)
-
 
         # computing the sinusoidal
         sinusoidal = torch.sin(self.linear(x))
@@ -172,9 +174,7 @@ class AnisotropicGaborLayer(nn.Module):
         return g_envelope * sinusoidal
 
 
-
-
-if __name__ == "__main__":
+""" if __name__ == "__main__":
     # test the model
     data_dim = 2
     model = MAGNet(data_dim=data_dim, hidden_channels=2, out_channels=2, no_layers=3)
@@ -190,3 +190,4 @@ if __name__ == "__main__":
     x = model(x)
     print(f"results : {x}")
     print(x.shape)
+ """

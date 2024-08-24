@@ -85,12 +85,14 @@ def fftconv(
     return out
 
 
-batch_size = 2
-num_channels = 3
+# test
+""" if __name__ == "__main__":
+    batch_size = 2
+    num_channels = 3
 
-x = torch.randn(batch_size, num_channels, 16)
-kernel = torch.randn(num_channels, num_channels, 3)
-bias = torch.randn(num_channels)
-output = fftconv(x, kernel, bias)
+    x = torch.randn(batch_size, num_channels, 16)
+    kernel = torch.randn(num_channels, num_channels, 3)
+    bias = torch.randn(num_channels)
+    output = fftconv(x, kernel, bias)
 
-print(output)
+    print(output) """
