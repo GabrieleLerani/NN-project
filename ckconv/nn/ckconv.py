@@ -41,7 +41,7 @@ class CKConv(nn.Module):
         # 2. Get the kernel
         conv_kernel = self.KernelNet(kernel_positions)
 
-        # 3. Construct the masked
+        # 3. Get the mask
         mask = self.gaussian_mask(
             kernel_pos=kernel_positions,
             mask_mean_param=self.mask_mean_param, # TODO check mask_mean_param
