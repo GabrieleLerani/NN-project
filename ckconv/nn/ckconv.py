@@ -105,11 +105,13 @@ class CKConv(nn.Module):
 
         # TODO check fft and bias
 
+        # general dim depth-wise fft convolution
         convFft = fftconv(x=x, kernel=conv_kernel, bias=self.bias)
 
-        res_x = x + convFft
+        # TODO general convolution ex:conv_2d pointwise convolution
+        out = None
 
-        return res_x
+        return out
 
 
 if __name__ == "__main__":
