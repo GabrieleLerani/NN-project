@@ -1,1 +1,1 @@
-from .ckconv import CKConv
+from .SepFlexConv import SepFlexConv

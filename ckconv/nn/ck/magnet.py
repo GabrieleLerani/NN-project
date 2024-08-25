@@ -2,7 +2,7 @@ from torch import nn
 from ck import GetLinear
 from ck import linspace_grid
 import torch
-
+import math
 
 class MFN(nn.Module):
     def __init__(
@@ -45,7 +45,9 @@ class MFN(nn.Module):
             )
         )
 
-    def re_weight_output_layer(self, factor: float):
+        self.reweighted_output_layer = False
+
+    def re_weight_output_layer(self, kernel_positions: torch.Tensor, in_channels: int, data_dim: int):
         """
         Re-weights the last layer of the kernel net by factor = gain / sqrt(in_channels * kernel_size).
         Args:
@@ -53,9 +55,26 @@ class MFN(nn.Module):
         Returns:
             None
         """
-        # get the last layer and re-weight it
-        self.linearLayer[-1].weight.data *= factor 
-                                                       
+
+        if not self.reweighted_output_layer:
+
+            # Re weight the last layer of the kernel net
+            
+            kernel_size = torch.Tensor([*kernel_positions.shape[data_dim:]]).prod().item() # just a way to get the kernel size 
+            # [1, 2, 33, 33] -> [33,33] for data_dim=2
+            # prod multiplies all elements in the tensor i.e. 33*33 = 1089
+            # item converts the tensor to a python number
+            
+            # define gain / sqrt(in_channels * kernel_size) by Chang et al. (2020)
+            print(f"kernel_size: {kernel_size}")
+            print(f"in_channels: {in_channels}")
+            factor = 1.0 / math.sqrt(in_channels * kernel_size)
+
+            # get the last layer and re-weight it
+            self.linearLayer[-1].weight.data *= factor 
+
+            # set the flag to True so that the output layer is only re-weighted the first time                                          
+            self.reweighted_output_layer = True
 
 
     def forward(self, x):
@@ -191,10 +210,10 @@ class AnisotropicGaborLayer(nn.Module):
         return g_envelope * sinusoidal
 
 
-""" if __name__ == "__main__":
+if __name__ == "__main__":
     # test the model
     data_dim = 2
-    model = MAGNet(data_dim=data_dim, hidden_channels=2, out_channels=2, no_layers=3)
+    model = MAGNet(data_dim=data_dim, hidden_channels=140, out_channels=2, no_layers=3)
 
     x = linspace_grid(
         [
@@ -207,4 +226,4 @@ class AnisotropicGaborLayer(nn.Module):
     x = model(x)
     print(f"results : {x}")
     print(x.shape)
- """
+ 
