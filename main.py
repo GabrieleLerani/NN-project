@@ -1,10 +1,19 @@
 from utils import yaml_utils
 import torch
-from models import GPCNN
+
 from data import Loader
 import torchvision.transforms as transforms
 
-def main():
+import hydra
+from omegaconf import OmegaConf
+
+
+@hydra.main(version_base=None, config_path="config", config_name="config")
+def main(cfg: OmegaConf) -> None:
+    print(OmegaConf.to_yaml(cfg))
+    
+
+
     pass
 
 

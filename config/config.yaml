@@ -1,15 +1,17 @@
-cnn_4_110_model:
-  hidden_units : 64
-  hidden_layers : 2
-  blocks: 4
-  channels: 110
+net:
+  data_dim: 3
+  in_channels: 64
+  hidden_channels: 128
+  bias: False
 
-cnn_6_380_model:
-  hidden_units : 64
-  hidden_layers : 2
-  blocks: 6
-  channels: 380
-  
+kernel:
+  kernel_no_layers: 4
+  kernel_hidden_channels: 256
+  kernel_size: 33
+  conv_type: "conv"
+  fft_threshold: 50
+
+# TODO
 train:
   warm_up_epochs: 10
   epochs : 20

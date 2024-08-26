@@ -5,7 +5,7 @@ from ck import linspace_grid
 from ck import GetLinear
 from conv import fftconv
 from conv import conv as simple_conv
-
+from omegaconf import OmegaConf
 
 
 class SepFlexConv(nn.Module):
@@ -40,13 +40,9 @@ class SepFlexConv(nn.Module):
         self,
         data_dim: int,
         in_channels: int,
-        hidden_channels: int,
-        kernel_no_layers: int,
-        kernel_hidden_channels: int,
-        kernel_size: int = 33,
-        conv_type: str = "conv",
-        fft_thresold: int = 50,
-        bias: bool = False, 
+        out_channels: int, # TODO 
+        net_cfg: OmegaConf,
+        kernel_cfg: OmegaConf, 
     ):
         """
         Initializes the CKConv module.
@@ -64,31 +60,41 @@ class SepFlexConv(nn.Module):
         """
         super().__init__()
 
-        self.kernel_size = kernel_size
+        # sep flex conv parameters
+        self.data_dim = data_dim
+        self.in_channels = in_channels
+        hidden_channels = net_cfg.hidden_channels
+    
+        
+        # kernel parameters
+        kernel_no_layers = kernel_cfg.kernel_no_layers
+        kernel_hidden_channels = kernel_cfg.kernel_hidden_channels
+        self.kernel_size = kernel_cfg.kernel_size
+        self.conv_type = kernel_cfg.conv_type
+        self.fft_threshold = kernel_cfg.fft_threshold
+        
 
         # init relative positions of the kernel
         self.kernel_positions = torch.zeros(1)
 
-        # init random bias with in_channels dimensions
-        self.bias = torch.randn(in_channels)
-        self.bias.data.fill_(0.0)
+        if net_cfg.bias:
+            # init random bias with in_channels dimensions
+            self.bias = torch.randn(in_channels)
+            self.bias.data.fill_(0.0)
+        else :
+            self.bias = None
 
-        # store variables
-        self.data_dim = data_dim
-        self.in_channels = in_channels
 
         # init gaussian mask parameter
         self.mask_mean = torch.nn.Parameter(torch.zeros(data_dim)) # mi = 0
         self.mask_sigma = torch.nn.Parameter(torch.ones(data_dim))
 
-        self.conv_type = conv_type
-        self.fft_thresold = fft_thresold
-
+    
         # Define the kernel net, in our case always a MAGNet
         self.KernelNet = MAGNet(
             data_dim=data_dim,
             hidden_channels=kernel_hidden_channels,
-            out_channels=in_channels,
+            out_channels=in_channels, # always in channel because separable
             no_layers=kernel_no_layers,
         )
         
@@ -97,7 +103,7 @@ class SepFlexConv(nn.Module):
             dim=data_dim,
             in_channels=in_channels,
             out_channels=hidden_channels,
-            bias=bias,
+            bias=net_cfg.bias,
         )
         
 
@@ -219,7 +225,7 @@ class SepFlexConv(nn.Module):
 
         size = torch.tensor(masked_kernel.shape[2:]) # -> [33,33] for data_dim=2
         # fftconv is used when the size of the kernel is large enough
-        if self.conv_type == "fftconv": #and torch.all(size > self.fft_thresold):
+        if self.conv_type == "fftconv" and torch.all(size > self.fft_thresold):
             out = fftconv(x=x, kernel=masked_kernel, bias=self.bias)
         else:
             out = simple_conv(x=x, kernel=masked_kernel, bias=self.bias)
@@ -232,33 +238,26 @@ class SepFlexConv(nn.Module):
 
 
 def test_1D_sep_flex_conv():
-    # Define the parameters
-    data_dim = 1
-    in_channels = 1
+    # Load the configuration
+    cfg = OmegaConf.load('/config/config.yaml')
     
-    hidden_channels = 140
-    kernel_no_layers = 3
-    kernel_hidden_channels = 32
-    kernel_size = 65
-    conv_type = "conv"
-    fft_thresold = 50
-    bias = False
+    # Update the configuration for 1D case
+    cfg.net.data_dim = 1
+    cfg.net.in_channels = 1
+    cfg.net.kernel_size = 65
 
     # Instantiate the SepFlexConv model
     model = SepFlexConv(
-        data_dim=data_dim,
-        in_channels=in_channels,
-        hidden_channels=hidden_channels,
-        kernel_no_layers=kernel_no_layers,
-        kernel_hidden_channels=kernel_hidden_channels,
-        kernel_size=kernel_size,
-        conv_type=conv_type,
-        fft_thresold=fft_thresold,
-        bias=bias
+        data_dim=cfg.net.data_dim,
+        in_channels=cfg.net.in_channels,
+        out_channels=cfg.net.hidden_channels,  # Assuming out_channels is hidden_channels
+        net=cfg.net,
+        kernel_cfg=cfg.kernel_cfg
     )
 
     # Create a sample input tensor
-    x = torch.ones(size=(100, in_channels, 784)).float()
+    x = torch.ones(size=(100, cfg.net.in_channels, 784)).float()
+    
     # Perform a forward pass
     output = model(x)
 
@@ -267,32 +266,25 @@ def test_1D_sep_flex_conv():
 
 
 def test_2D_sep_flex_conv():
-    # Define the parameters
-    data_dim = 2
-    in_channels = 3
-    hidden_channels = 140
-    kernel_no_layers = 3
-    kernel_hidden_channels = 32
-    kernel_size = 33
-    conv_type = "conv" # TODO check with fftconv
-    fft_thresold = 50
-    bias = False
+    # Load the configuration
+    cfg = OmegaConf.load('config/config.yaml')
+    
+    # cfg.net.data_dim = 2
+    # cfg.net.in_channels = 3
+
+    # cfg.net.kernel_size = 65
 
     # Instantiate the SepFlexConv model
     model = SepFlexConv(
-        data_dim=data_dim,
-        in_channels=in_channels,
-        hidden_channels=hidden_channels,
-        kernel_no_layers=kernel_no_layers,
-        kernel_hidden_channels=kernel_hidden_channels,
-        kernel_size=kernel_size,
-        conv_type=conv_type,
-        fft_thresold=fft_thresold,
-        bias=bias
+        data_dim=cfg.net.data_dim,
+        in_channels=cfg.net.in_channels,
+        out_channels=cfg.net.hidden_channels,  # Assuming out_channels is hidden_channels
+        net_cfg=cfg.net,
+        kernel_cfg=cfg.kernel
     )
 
     # Create a sample input tensor
-    x = torch.ones(size=(64, in_channels, 32, 32)).float()
+    x = torch.ones(size=(64, cfg.net.in_channels, 32, 32)).float()
     
     # Perform a forward pass
     output = model(x)
