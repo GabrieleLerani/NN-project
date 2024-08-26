@@ -1,1 +1,1 @@
-
+from .ccnn import CCNN

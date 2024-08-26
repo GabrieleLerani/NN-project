@@ -1,20 +1,29 @@
-from utils import yaml_utils
 import torch
 
 from data import Loader
 import torchvision.transforms as transforms
 
+
 import hydra
 from omegaconf import OmegaConf
-
+from models import CCNN
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: OmegaConf) -> None:
     print(OmegaConf.to_yaml(cfg))
     
+    x = torch.ones(size=(32, cfg.net.in_channels, 32, 32)).float()
 
+    model = CCNN(
+        in_channels=cfg.net.in_channels, # TODO in channels and out should be determined from dataset see datamodule
+        out_channels=cfg.net.out_channels,
+        data_dim=cfg.net.data_dim,
+        cfg=cfg
+    )
 
-    pass
+    x = model(x)
+
+    print(x.shape)
 
 
 if __name__ == "__main__":
