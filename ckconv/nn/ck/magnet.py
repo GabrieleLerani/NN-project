@@ -3,6 +3,7 @@ from ck import GetLinear
 from ck import linspace_grid
 import torch
 import math
+import numpy as np
 
 class MFN(nn.Module):
     def __init__(
@@ -155,19 +156,17 @@ class AnisotropicGaborLayer(nn.Module):
             ]
         )
 
-        # TODO init weights and biases
         # init the frequency components W_g for the orientation and frequency of sinusoidal and b for phase offset
 
-        # self.linear.weight.data = nn.Parameter(torch.randn(hidden_channels,data_dim,1,1))
-        # self.linear.bias = nn.Parameter(torch.randn(hidden_channels))
+        scaling_factor = 25.6
 
-        # self.linear.weight.data *= self.gamma_x.view(
-        #     *self.gamma_x.shape, *((1,) * data_dim)
-        # )
+        self.linear.weight = nn.Parameter(torch.randn(hidden_channels,data_dim,*((1,) * data_dim)))
+        self.linear.weight.data *= scaling_factor * self.gamma[0].view(
+            *self.gamma[0].shape, *((1,) * data_dim)
+        )
 
-        # print(f"Size {self.linear.weight.shape}")
-
-        # self.linear.bias.data.fill_(0.0)
+        self.linear.bias = nn.Parameter(torch.randn(hidden_channels))
+        self.linear.bias.data.uniform_(-np.pi, np.pi)
 
     def forward(self, x):
         """
