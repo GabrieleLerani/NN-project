@@ -54,15 +54,15 @@ class CCNN(nn.Module):
         self.batch_norm_layer_2 = GetBatchNormalization(data_dim=data_dim, num_features=out_channels)
 
         # global average pooling layer
-        # TODO output_size parameter
-        self.global_avg_pool_layer = GetAdaptiveAvgPool(data_dim=data_dim, output_size=output_size)
+        # the information of each channel is compressed into a single value
+        self.global_avg_pool_layer = GetAdaptiveAvgPool(data_dim=data_dim, output_size=(1,) * data_dim)
 
         # pointwise linear convolutional layer
         self.pointwise_linear_layer = GetLinear(data_dim, in_channels, out_channels)
 
     def forward(self, x):
         """
-        Standard method of nn.modules
+        TODO
         """
         out = self.gelu_layer(
             self.batch_norm_layer_1(
