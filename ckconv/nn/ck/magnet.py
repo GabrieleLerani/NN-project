@@ -1,6 +1,6 @@
 from torch import nn
-from linear import GetLinear
-from grid import linspace_grid
+from .linear import GetLinear
+from .grid import linspace_grid
 import torch
 import math
 import numpy as np

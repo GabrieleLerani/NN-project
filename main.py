@@ -12,7 +12,7 @@ from models import CCNN
 def main(cfg: OmegaConf) -> None:
     print(OmegaConf.to_yaml(cfg))
     
-    x = torch.ones(size=(32, cfg.net.in_channels, 32, 32)).float()
+    x = torch.ones(size=(8, cfg.net.in_channels, *(32,) * cfg.net.data_dim)).float()
 
     model = CCNN(
         in_channels=cfg.net.in_channels, # TODO in channels and out should be determined from dataset see datamodule

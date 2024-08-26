@@ -1,10 +1,8 @@
 import torch
 from torch import nn
-from ck import MAGNet
-from ck import linspace_grid
-from ck import GetLinear
-from conv import fftconv
-from conv import conv as simple_conv
+from ckconv.nn.ck import MAGNet, linspace_grid, GetLinear
+from ckconv.nn.conv import fftconv, conv as simple_conv
+
 from omegaconf import OmegaConf
 
 

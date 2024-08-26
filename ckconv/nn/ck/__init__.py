@@ -1,3 +1,3 @@
-from ck.linear import GetLinear
-from ck.grid import linspace_grid
-from ck.magnet import MAGNet
+from .linear import GetLinear
+from .grid import linspace_grid
+from .magnet import MAGNet

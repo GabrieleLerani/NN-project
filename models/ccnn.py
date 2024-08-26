@@ -2,8 +2,8 @@ from torch import nn
 from models.modules import S4Block
 from ckconv.nn import SepFlexConv
 from ckconv.nn.ck import GetLinear
-from utils import GetBatchNormalization
-from utils import GetAdaptiveAvgPool
+from models.modules.utils import GetBatchNormalization
+from models.modules.utils import GetAdaptiveAvgPool
 from omegaconf import OmegaConf
 
 class CCNN(nn.Module):
@@ -42,36 +42,38 @@ class CCNN(nn.Module):
         """
         super(CCNN, self).__init__()
         
-        self.no_blocks = cfg.net_cfg.no_blocks
+        self.no_blocks = cfg.net.no_blocks
+
+        hidden_channels = cfg.net.hidden_channels
 
         # separable flexible convolutional layer
         self.sep_flex_conv_layer = SepFlexConv(
             data_dim=data_dim,
             in_channels=in_channels, 
-            out_channels=out_channels,
-            net_cfg=cfg.net_cfg,
-            kernel_cfg=cfg.kernel_cfg
+            out_channels=hidden_channels,
+            net_cfg=cfg.net,
+            kernel_cfg=cfg.kernel
         )
 
         # number of features = the number of output channels of the separable flexible convolutional layer
-        self.batch_norm_layer_1 = GetBatchNormalization(data_dim=data_dim, num_features=out_channels)
+        self.batch_norm_layer_1 = GetBatchNormalization(data_dim=data_dim, num_features=hidden_channels)
 
         self.gelu_layer = nn.GELU()
         
         self.blocks = []
         for i in range(self.no_blocks):
             # TODO parameters for S4Block
-            s4 = S4Block(in_channels=out_channels, out_channels=out_channels, data_dim=data_dim)
+            s4 = S4Block(in_channels=hidden_channels, out_channels=hidden_channels, data_dim=data_dim, net_cfg=cfg.net, kernel_cfg=cfg.kernel)
             self.blocks.append(s4)
 
-        self.batch_norm_layer_2 = GetBatchNormalization(data_dim=data_dim, num_features=out_channels)
+        self.batch_norm_layer_2 = GetBatchNormalization(data_dim=data_dim, num_features=hidden_channels)
 
         # global average pooling layer
         # the information of each channel is compressed into a single value
         self.global_avg_pool_layer = GetAdaptiveAvgPool(data_dim=data_dim, output_size=(1,) * data_dim)
 
         # pointwise linear convolutional layer
-        self.pointwise_linear_layer = GetLinear(data_dim, in_channels, out_channels)
+        self.pointwise_linear_layer = GetLinear(data_dim, hidden_channels, out_channels)
 
     def forward(self, x):
         """
@@ -88,4 +90,4 @@ class CCNN(nn.Module):
         
         out = self.pointwise_linear_layer(self.global_avg_pool_layer(self.batch_norm_layer_2(out)))
 
-        return out
+        return out.squeeze()

@@ -1,8 +1,9 @@
 from torch import nn
 from ckconv.nn import SepFlexConv
 from ckconv.nn.ck import GetLinear
-from utils import GetBatchNormalization
-from utils import GetDropout
+from models.modules.utils import GetBatchNormalization
+from models.modules.utils import GetDropout
+from omegaconf import OmegaConf
 
 class S4Block(nn.Module):
     """
@@ -25,7 +26,14 @@ class S4Block(nn.Module):
     """
 
 
-    def __init__(self, in_channels, out_channels, data_dim):
+    def __init__(
+            self,
+            in_channels,
+            out_channels,
+            data_dim,
+            net_cfg: OmegaConf,
+            kernel_cfg: OmegaConf, 
+        ):
         """
         Method to init the S4 block
         """
@@ -37,7 +45,9 @@ class S4Block(nn.Module):
         self.sep_flex_conv_layer = SepFlexConv(
             data_dim=data_dim,
             in_channels=in_channels,
-            out_channels=out_channels
+            out_channels=out_channels,
+            net_cfg=net_cfg,
+            kernel_cfg=kernel_cfg
         )
         
         self.gelu_layer1 = nn.GELU()

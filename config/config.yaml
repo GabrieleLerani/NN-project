@@ -1,6 +1,7 @@
 net:
   data_dim: 2
   in_channels: 3
+  out_channels: 10
   hidden_channels: 140
   no_blocks: 4
   bias: False
