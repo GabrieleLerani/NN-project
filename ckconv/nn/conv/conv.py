@@ -3,8 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
-
 def conv1d(
     x: torch.Tensor,
     kernel: torch.Tensor,
@@ -132,14 +130,21 @@ def fftconv(
     print(
         f"expeted_shape : [num_channels, k_dim1, k_dim2, ...] ,kernel_fr shape: {kernel_fr.shape}"
     )
+    # Element-wise Multiplication in Fourier domain
     output_fr = torch.einsum("bi..., oi... -> bo...", x_fr, kernel_fr)
 
-    # Element-wise Multiplication in Fourier domain
+    # Inverse FFT to transform the result back to the spatial domain
     out = torch.fft.irfftn(output_fr, dim=tuple(range(2, x_padded.ndim))).float()
 
-    # Generalization to higher dimensions
+    # This part of the code ensures that the output tensor out has the same spatial dimensions as the original input tensor x (before padding)
+
+    # Select all elements in the batch_size and channels dimensions (first two dimensions of out)
     slices = [slice(None), slice(None)]
+    # Extension of the slices list to include slices for each spatial dimension (for all dimensions [data_dim])
+    # Let's assume x_padded has a shape of [batch_size, channels, height, width]. After this step, slices might look like:
+    # - slices = [slice(None), slice(None), slice(None, height), slice(None, width)]
     slices.extend(slice(None, x_padded.shape[-i]) for i in range(1, data_dim + 1))
+    # This operation effectively crops the out tensor to remove any padding that was added during the earlier steps
     out = out[tuple(slices)]
 
     # Add bias if provided
