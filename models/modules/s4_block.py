@@ -1,19 +1,47 @@
 from torch import nn
 from models import SFC
-
+from ckconv.nn import SepFlexConv
 
 class S4Block(nn.Module):
-    def __init__(self, L, in_channels, out_channels):
+    """
+    Create a S4 block (Gu et al., 2022) as defined in the Continuous CNN architecture.
+
+          input
+            |
+    | -------------|
+    |            BarchNorm             
+    |            SepFlecConv             
+    |            GELU     
+    |            DropOut          
+    |            PointwiseLinear                
+    |            GELU             
+    |              |
+    |---->(+)<-----|
+           |
+        output
+
+    """
+
+
+    def __init__(self, in_channels, out_channels):
         """
-        Method to init the residual network composed of x L S4 block
+        Method to init the S4 block
         """
-        super(S4Block, self).__init__()
+        super().__init__()
 
         self.batch_norm_layer = nn.BatchNorm2d(num_features=in_channels)
 
         # separable flexible convolutional layer
-        self.sep_flex_conv_layer = SFC(
-            in_channels=in_channels, out_channels=out_channels
+        self.sep_flex_conv_layer = SepFlexConv(
+            data_dim=data_dim,
+            in_channels=in_channels,
+            hidden_channels=hidden_channels,
+            kernel_no_layers=kernel_no_layers,
+            kernel_hidden_channels=kernel_hidden_channels,
+            kernel_size=kernel_size,
+            conv_type=conv_type,
+            fft_thresold=fft_thresold,
+            bias=bias
         )
 
         self.gelu_layer = nn.GELU()

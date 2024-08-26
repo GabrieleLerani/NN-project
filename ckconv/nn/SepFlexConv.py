@@ -40,7 +40,6 @@ class SepFlexConv(nn.Module):
         self,
         data_dim: int,
         in_channels: int,
-        out_channels: int,
         hidden_channels: int,
         kernel_no_layers: int,
         kernel_hidden_channels: int,
@@ -236,12 +235,12 @@ def test_1D_sep_flex_conv():
     # Define the parameters
     data_dim = 1
     in_channels = 1
-    out_channels = 10
+    
     hidden_channels = 140
     kernel_no_layers = 3
     kernel_hidden_channels = 32
     kernel_size = 65
-    conv_type = "fftconv"
+    conv_type = "conv"
     fft_thresold = 50
     bias = False
 
@@ -249,7 +248,6 @@ def test_1D_sep_flex_conv():
     model = SepFlexConv(
         data_dim=data_dim,
         in_channels=in_channels,
-        out_channels=out_channels,
         hidden_channels=hidden_channels,
         kernel_no_layers=kernel_no_layers,
         kernel_hidden_channels=kernel_hidden_channels,
@@ -272,7 +270,6 @@ def test_2D_sep_flex_conv():
     # Define the parameters
     data_dim = 2
     in_channels = 3
-    out_channels = 10
     hidden_channels = 140
     kernel_no_layers = 3
     kernel_hidden_channels = 32
@@ -285,7 +282,6 @@ def test_2D_sep_flex_conv():
     model = SepFlexConv(
         data_dim=data_dim,
         in_channels=in_channels,
-        out_channels=out_channels,
         hidden_channels=hidden_channels,
         kernel_no_layers=kernel_no_layers,
         kernel_hidden_channels=kernel_hidden_channels,
