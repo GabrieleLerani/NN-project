@@ -268,16 +268,12 @@ def test_2D_sep_flex_conv():
     # Load the configuration
     cfg = OmegaConf.load('config/config.yaml')
     
-    # cfg.net.data_dim = 2
-    # cfg.net.in_channels = 3
-
-    # cfg.net.kernel_size = 65
 
     # Instantiate the SepFlexConv model
     model = SepFlexConv(
         data_dim=cfg.net.data_dim,
         in_channels=cfg.net.in_channels,
-        out_channels=cfg.net.hidden_channels,  # Assuming out_channels is hidden_channels
+        out_channels=cfg.net.hidden_channels,  
         net_cfg=cfg.net,
         kernel_cfg=cfg.kernel
     )

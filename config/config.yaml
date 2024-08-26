@@ -1,12 +1,12 @@
 net:
-  data_dim: 3
-  in_channels: 64
-  hidden_channels: 128
+  data_dim: 2
+  in_channels: 3
+  hidden_channels: 140
   bias: False
 
 kernel:
   kernel_no_layers: 4
-  kernel_hidden_channels: 256
+  kernel_hidden_channels: 32
   kernel_size: 33
   conv_type: "conv"
   fft_threshold: 50
