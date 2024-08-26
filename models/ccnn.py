@@ -1,7 +1,7 @@
 from torch import nn
 from models import S4Block
 from ckconv import SepFlexConv
-from ck import GetLinear
+from ckconv.nn.ck import GetLinear
 from utils import GetBatchNormalization
 from utils import GetAdaptiveAvgPool
 

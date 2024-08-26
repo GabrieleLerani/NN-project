@@ -1,6 +1,6 @@
 from torch import nn
 from ckconv.nn import SepFlexConv
-from ck import GetLinear
+from ckconv.nn.ck import GetLinear
 from utils import GetBatchNormalization
 from utils import GetDropout
 
