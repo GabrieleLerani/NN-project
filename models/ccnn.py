@@ -38,9 +38,6 @@ class CCNN(nn.Module):
         # pointwise linear convolutional layer
         self.pointwise_linear_layer = GetLinear(data_dim, in_channels, out_channels)
 
-        # TODO verify if needed because in the paper is written that they perform image classification
-        self.linear = nn.Linear(in_features=out_channels, out_features=num_classes)
-
     def forward(self, x):
         """
         Standard method of nn.modules
@@ -55,8 +52,5 @@ class CCNN(nn.Module):
             out = self.blocks[i](out)
         
         out = self.pointwise_linear_layer(self.global_avg_pool_layer(self.batch_norm_layer_2(out)))
-        
-        # TODO used to flatten to (N,num_classes) maybe is needed the linear
-        x = x.view(x.size(0), -1)
 
-        return x
+        return out
