@@ -37,15 +37,9 @@ class S4Block(nn.Module):
         self.sep_flex_conv_layer = SepFlexConv(
             data_dim=data_dim,
             in_channels=in_channels,
-            hidden_channels=hidden_channels,
-            kernel_no_layers=kernel_no_layers,
-            kernel_hidden_channels=kernel_hidden_channels,
-            kernel_size=kernel_size,
-            conv_type=conv_type,
-            fft_thresold=fft_thresold,
-            bias=bias
+            out_channels=out_channels
         )
-
+        
         self.gelu_layer1 = nn.GELU()
 
         self.dropout_layer = GetDropout(data_dim=data_dim)

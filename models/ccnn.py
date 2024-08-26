@@ -6,14 +6,35 @@ from utils import GetBatchNormalization
 from utils import GetAdaptiveAvgPool
 
 class CCNN(nn.Module):
-    def __init__(self, L, in_channels, out_channels, num_classes, data_dim):
+    """
+    CCNN architecture (Romero et al., 2022) as defined in the original paper.
+
+          input
+            |
+        SepFlexConv
+            |
+        BatchNorm
+            |
+           GELU
+            |
+        L x S4Block
+            |
+        BatchNorm
+            |
+        GlobalAvgPool
+            |
+        PointwiseLinear
+            |
+          output
+    """
+    def __init__(self, no_blocks, in_channels, out_channels, data_dim):
         """
         Method to init the General Purpose Convolutional Neural Network.
         The model is used to perform spatial data classification.
         The network can be constructed with different block number and channel number.
         """
         super(CCNN, self).__init__()
-        # TODO parameters of the model
+        
         # separable flexible convolutional layer
         self.sep_flex_conv_layer = SepFlexConv(
             in_channels=in_channels, out_channels=out_channels
@@ -25,9 +46,10 @@ class CCNN(nn.Module):
         self.gelu_layer = nn.GELU()
         
         self.blocks = []
-        for i in range(L):
+        for i in range(no_blocks):
             # TODO parameters for S4Block
-            self.blocks.append(S4Block())
+            s4 = S4Block(in_channels=out_channels, out_channels=out_channels, data_dim=data_dim)
+            self.blocks.append(s4)
 
         self.batch_norm_layer_2 = GetBatchNormalization(data_dim=data_dim, num_features=out_channels)
 
