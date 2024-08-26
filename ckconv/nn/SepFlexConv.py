@@ -36,7 +36,6 @@ class SepFlexConv(nn.Module):
     """
 
     def __init__(
-
         self,
         data_dim: int,
         in_channels: int,
