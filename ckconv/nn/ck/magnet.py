@@ -66,8 +66,6 @@ class MFN(nn.Module):
             # item converts the tensor to a python number
             
             # define gain / sqrt(in_channels * kernel_size) by Chang et al. (2020)
-            print(f"kernel_size: {kernel_size}")
-            print(f"in_channels: {in_channels}")
             factor = 1.0 / math.sqrt(in_channels * kernel_size)
 
             # get the last layer and re-weight it

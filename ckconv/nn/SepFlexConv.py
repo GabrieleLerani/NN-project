@@ -220,7 +220,7 @@ class SepFlexConv(nn.Module):
 
         size = torch.tensor(masked_kernel.shape[2:]) # -> [33,33] for data_dim=2
         # fftconv is used when the size of the kernel is large enough
-        if self.conv_type == "fftconv" and torch.all(size > self.fft_thresold):
+        if self.conv_type == "fftconv": #and torch.all(size > self.fft_thresold):
             out = fftconv(x=x, kernel=masked_kernel, bias=self.bias)
         else:
             out = simple_conv(x=x, kernel=masked_kernel, bias=self.bias)
@@ -241,7 +241,7 @@ def test_1D_sep_flex_conv():
     kernel_no_layers = 3
     kernel_hidden_channels = 32
     kernel_size = 65
-    conv_type = "conv"
+    conv_type = "fftconv"
     fft_thresold = 50
     bias = False
 
@@ -306,5 +306,5 @@ def test_2D_sep_flex_conv():
 
 
 if __name__ == "__main__":
-    test_1D_sep_flex_conv()
+    #test_1D_sep_flex_conv()
     test_2D_sep_flex_conv()

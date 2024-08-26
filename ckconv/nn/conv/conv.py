@@ -59,7 +59,6 @@ def conv(
     x: torch.Tensor,
     kernel: torch.Tensor,
     bias: Optional[torch.Tensor] = None,
-    **kwargs,
 ):
     
     data_dim = len(x.shape) - 2
@@ -84,7 +83,6 @@ def fftconv(
     x: torch.Tensor,
     kernel: torch.Tensor,
     bias: Optional[torch.Tensor] = None,
-    **kwargs,
 ) -> torch.Tensor:
 
     data_dim = len(x.shape) - 2
@@ -146,21 +144,8 @@ def fftconv(
 
     # Add bias if provided
     if bias is not None:
-        out += bias.view(1, -1, *([1] * data_dim))
+        out = out + bias.view(1, -1, *([1] * data_dim))
 
     return out
-
-
-# test
-""" if __name__ == "__main__":
-    batch_size = 2
-    num_channels = 3
-
-    x = torch.randn(batch_size, num_channels, 16)
-    kernel = torch.randn(num_channels, num_channels, 3)
-    bias = torch.randn(num_channels)
-    output = fftconv(x, kernel, bias)
-
-    print(output) """
 
 
