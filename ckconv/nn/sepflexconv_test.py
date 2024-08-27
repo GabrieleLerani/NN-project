@@ -24,7 +24,7 @@ class TestSepFlexConv(unittest.TestCase):
         self.model = SepFlexConv(data_dim, in_channels, out_channels, net_cfg, kernel_cfg)
 
     def test_forward_pass(self):
-        # Create a sample input tensor with shape [64, 3, 32, 32]
+        
         x = torch.randn(64, 3, 32, 32)
         
         # Forward pass
@@ -39,7 +39,7 @@ class TestSepFlexConv(unittest.TestCase):
         
         self.assertEqual(out.shape, (64, 3, 32, 32), "Spatial convolution output shape mismatch")
         
-        # Pointwise convolution
+        
         out = self.model.pointwise_conv(out)
         self.assertEqual(out.shape, (64, 140, 32, 32), "Pointwise convolution output shape mismatch")
 

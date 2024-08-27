@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from ckconv.nn.ck import MAGNet, linspace_grid, GetLinear
+from ckconv.nn.ck import MAGNet, create_coordinates, GetLinear
 from ckconv.nn.conv import fftconv, conv as simple_conv
 
 from omegaconf import OmegaConf
@@ -37,7 +37,6 @@ class SepFlexConv(nn.Module):
         self,
         data_dim: int,
         in_channels: int,
-        out_channels: int, # TODO 
         net_cfg: OmegaConf,
         kernel_cfg: OmegaConf, 
     ):
@@ -84,7 +83,7 @@ class SepFlexConv(nn.Module):
 
         # init gaussian mask parameter
         self.mask_mean = torch.nn.Parameter(torch.zeros(data_dim)) # mi = 0
-        self.mask_sigma = torch.nn.Parameter(torch.ones(data_dim))
+        self.mask_sigma = torch.nn.Parameter(torch.ones(data_dim)) # sigma = 1
 
     
         # Define the kernel net, in our case always a MAGNet
@@ -150,12 +149,14 @@ class SepFlexConv(nn.Module):
 
             # Creates the vector of relative positions
             
-            kernel_positions = linspace_grid(
-                grid_sizes=torch.Tensor([self.kernel_size]).repeat(self.data_dim)
+            kernel_positions = create_coordinates(
+                kernel_size=self.kernel_size,
+                data_dim=self.data_dim,
             )
-            # -> Grid sized: [kernel_size * data_dim]
+            # -> Grid sized: [kernel_size] * data_dim
             # -> kernel_positions : [dim, kernel_size, kernel_size]
 
+            # add one dimension to match the input tensor
             kernel_positions = kernel_positions.unsqueeze(0)
             # -> kernel_positions sized: [1, dim, kernel_size, kernel_size]
 

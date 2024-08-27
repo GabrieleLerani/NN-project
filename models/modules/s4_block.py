@@ -45,7 +45,6 @@ class S4Block(nn.Module):
         self.sep_flex_conv_layer = SepFlexConv(
             data_dim=data_dim,
             in_channels=in_channels,
-            out_channels=out_channels,
             net_cfg=net_cfg,
             kernel_cfg=kernel_cfg
         )

@@ -1,3 +1,3 @@
 from .linear import GetLinear
-from .grid import linspace_grid
+from .create_coordinates import create_coordinates
 from .magnet import MAGNet
