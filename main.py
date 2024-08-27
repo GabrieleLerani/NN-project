@@ -3,11 +3,11 @@ import torch
 from data import Loader
 import torchvision.transforms as transforms
 
-
 import hydra
 from omegaconf import OmegaConf
 from models import CCNN
 
+# In order for Hydra to generate again the files, go to config/config.yaml and look for defaults: and hydra:
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: OmegaConf) -> None:
     print(OmegaConf.to_yaml(cfg))
