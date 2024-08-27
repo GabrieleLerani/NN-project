@@ -86,6 +86,8 @@ def fftconv(
     data_dim = len(x.shape) - 2
     # -> [batch_size, channels, x_dimension, y_dimension, ...] -> len[x.shape] = 2 + data_dim
 
+    assert data_dim == 1
+
     kernel_size = torch.tensor(kernel.shape[-data_dim:])
     assert torch.all(
         kernel_size % 2 != 0
@@ -131,7 +133,7 @@ def fftconv(
         f"expected_shape : [num_channels, k_dim1, k_dim2, ...] ,kernel_fr shape: {kernel_fr.shape}"
     )
     # Element-wise Multiplication in Fourier domain
-    output_fr = torch.einsum("bi..., oi... -> bo...", x_fr, kernel_fr)
+    output_fr = x_fr * kernel_fr
 
     # Inverse FFT to transform the result back to the spatial domain
     out = torch.fft.irfftn(output_fr, dim=tuple(range(2, x_padded.ndim))).float()
