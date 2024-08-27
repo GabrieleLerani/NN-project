@@ -125,10 +125,10 @@ def fftconv(
     # Assuming x_fr has shape [batch_size, num_channels, x_dim1, x_dim2, ...]
     # and kernel_fr has shape [num_channels, k_dim1, k_dim2, ...]
     print(
-        f"expeted_shape : [batch_size, num_channels, x_dim1, x_dim2, ...] , x_fr shape: {x_fr.shape}"
+        f"expected_shape : [batch_size, num_channels, x_dim1, x_dim2, ...] , x_fr shape: {x_fr.shape}"
     )
     print(
-        f"expeted_shape : [num_channels, k_dim1, k_dim2, ...] ,kernel_fr shape: {kernel_fr.shape}"
+        f"expected_shape : [num_channels, k_dim1, k_dim2, ...] ,kernel_fr shape: {kernel_fr.shape}"
     )
     # Element-wise Multiplication in Fourier domain
     output_fr = torch.einsum("bi..., oi... -> bo...", x_fr, kernel_fr)
@@ -143,7 +143,7 @@ def fftconv(
     # Extension of the slices list to include slices for each spatial dimension (for all dimensions [data_dim])
     # Let's assume x_padded has a shape of [batch_size, channels, height, width]. After this step, slices might look like:
     # - slices = [slice(None), slice(None), slice(None, height), slice(None, width)]
-    slices.extend(slice(None, x_padded.shape[-i]) for i in range(1, data_dim + 1))
+    slices.extend(slice(None, x.shape[-i]) for i in range(1, data_dim + 1))
     # This operation effectively crops the out tensor to remove any padding that was added during the earlier steps
     out = out[tuple(slices)]
 

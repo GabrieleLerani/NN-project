@@ -222,6 +222,7 @@ class SepFlexConv(nn.Module):
 
         size = torch.tensor(masked_kernel.shape[2:]) # -> [33,33] for data_dim=2
         # fftconv is used when the size of the kernel is large enough
+        # TODO the return value of fftconv is a tensor that has only 1 channel while pointwise_linear takes 3
         if self.conv_type == "fftconv" and torch.all(size > self.fft_thresold):
             out = fftconv(x=x, kernel=masked_kernel, bias=self.bias)
         else:
