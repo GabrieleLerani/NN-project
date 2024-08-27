@@ -1,6 +1,6 @@
 from torch import nn
 from .linear import GetLinear
-from .grid import linspace_grid
+from .create_coordinates import create_coordinates
 import torch
 import math
 import numpy as np
@@ -77,9 +77,7 @@ class MFN(nn.Module):
 
 
     def forward(self, x):
-        """
-        TODO
-        """
+        
         h = self.gabor_filters[0](x)
         for l in range(1, len(self.gabor_filters)):
             h = self.gabor_filters[l](x) * self.linearLayer[l - 1](h)
@@ -156,8 +154,7 @@ class AnisotropicGaborLayer(nn.Module):
             ]
         )
 
-        # init the frequency components W_g for the orientation and frequency of sinusoidal and b for phase offset
-
+        
         scaling_factor = 25.6
 
         self.linear.weight = nn.Parameter(torch.randn(hidden_channels,data_dim,*((1,) * data_dim)))
@@ -212,12 +209,9 @@ if __name__ == "__main__":
     data_dim = 2
     model = MAGNet(data_dim=data_dim, hidden_channels=140, out_channels=2, no_layers=3)
 
-    x = linspace_grid(
-        [
-            3,
-        ]
-        * data_dim
-    ).unsqueeze(0)
+    x = create_coordinates(
+        3, data_dim
+    )
     print(f"grid shape: {x.shape}")
     print(x)
     x = model(x)

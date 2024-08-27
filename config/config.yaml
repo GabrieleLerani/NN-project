@@ -1,3 +1,11 @@
+comment hydra if you want the configuration to be saved
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job_logging: disabled
+
+
 net:
   data_dim: 2
   in_channels: 3

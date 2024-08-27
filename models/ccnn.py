@@ -50,7 +50,6 @@ class CCNN(nn.Module):
         self.sep_flex_conv_layer = SepFlexConv(
             data_dim=data_dim,
             in_channels=in_channels, 
-            out_channels=hidden_channels,
             net_cfg=cfg.net,
             kernel_cfg=cfg.kernel
         )
@@ -76,9 +75,6 @@ class CCNN(nn.Module):
         self.pointwise_linear_layer = GetLinear(data_dim, hidden_channels, out_channels)
 
     def forward(self, x):
-        """
-        TODO
-        """
         out = self.gelu_layer(
             self.batch_norm_layer_1(
                 self.sep_flex_conv_layer(x)
