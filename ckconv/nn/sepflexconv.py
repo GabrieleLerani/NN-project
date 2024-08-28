@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from ckconv.nn.ck import MAGNet, create_coordinates, GetLinear
+from ckconv.nn.ck import MAGNet, create_coordinates, LinearLayer
 from ckconv.nn.conv import fftconv, conv as simple_conv
 
 from omegaconf import OmegaConf
@@ -95,7 +95,7 @@ class SepFlexConv(nn.Module):
         )
         
         # Define the pointwise convolution layer (page 4 original paper)
-        self.pointwise_conv = GetLinear(
+        self.pointwise_conv = LinearLayer(
             dim=data_dim,
             in_channels=in_channels,
             out_channels=hidden_channels,
@@ -154,11 +154,7 @@ class SepFlexConv(nn.Module):
                 data_dim=self.data_dim,
             )
             # -> Grid sized: [kernel_size] * data_dim
-            # -> kernel_positions : [dim, kernel_size, kernel_size]
-
-            # add one dimension to match the input tensor
-            kernel_positions = kernel_positions.unsqueeze(0)
-            # -> kernel_positions sized: [1, dim, kernel_size, kernel_size]
+            # -> kernel_positions : [1, dim, kernel_size, kernel_size]
 
             self.kernel_positions = kernel_positions.type_as(self.kernel_positions)
             # -> With form: [batch_size=1, dim, x_dimension, y_dimension, ...]

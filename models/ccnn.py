@@ -5,7 +5,7 @@ import torchmetrics
 
 from models.modules import S4Block
 from ckconv.nn import SepFlexConv
-from ckconv.nn.ck import GetLinear
+from ckconv.nn.ck import LinearLayer
 from models.modules.utils import GetBatchNormalization
 from models.modules.utils import GetAdaptiveAvgPool
 from omegaconf import OmegaConf
@@ -71,7 +71,7 @@ class CCNN(pl.LightningModule):
         # global average pooling layer (the information of each channel is compressed into a single value)
         self.global_avg_pool_layer = GetAdaptiveAvgPool(data_dim=data_dim, output_size=(1,) * data_dim)
         # pointwise linear convolutional layer
-        self.pointwise_linear_layer = GetLinear(data_dim, hidden_channels, out_channels)
+        self.pointwise_linear_layer = LinearLayer(data_dim, hidden_channels, out_channels)
 
         self.accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=out_channels)
         self.f1_score = torchmetrics.F1Score(task="multiclass", num_classes=out_channels)

@@ -1,5 +1,5 @@
 from torch import nn
-from .linear import GetLinear
+from .linear import LinearLayer
 from .create_coordinates import create_coordinates
 import torch
 import math
@@ -24,11 +24,10 @@ class MFN(nn.Module):
         # hidden layers
         self.linearLayer = nn.ModuleList(
             [
-                GetLinear(
+                LinearLayer(
                     dim=data_dim,
                     in_channels=hidden_channels,
                     out_channels=hidden_channels,
-                    stride=1,
                     bias=True,
                 )
                 for _ in range(no_layers - 1)
@@ -37,11 +36,10 @@ class MFN(nn.Module):
 
         # output layer
         self.linearLayer.append(
-            GetLinear(
+            LinearLayer(
                 dim=data_dim,
                 in_channels=hidden_channels,
                 out_channels=out_channels,
-                stride=1,
                 bias=True,
             )
         )
@@ -70,7 +68,7 @@ class MFN(nn.Module):
             factor = 1.0 / math.sqrt(in_channels * kernel_size)
 
             # get the last layer and re-weight it
-            self.linearLayer[-1].weight.data *= factor 
+            self.linearLayer[-1].layer.weight.data *= factor 
 
             # set the flag to True so that the output layer is only re-weighted the first time                                          
             self.reweighted_output_layer = True
@@ -126,11 +124,10 @@ class AnisotropicGaborLayer(nn.Module):
         self.data_dim = data_dim
 
         # linear layer
-        self.linear = GetLinear(
+        self.linear = LinearLayer(
             dim=data_dim,
             in_channels=data_dim,
             out_channels=hidden_channels,
-            stride=1,
             bias=True,
         )
 
@@ -169,7 +166,7 @@ class AnisotropicGaborLayer(nn.Module):
         """
         TODO
         """
-
+        print(x.shape)
         # coordinates (x,y,...)
         coord = [x[0][i] for i in range(self.data_dim)]
 
