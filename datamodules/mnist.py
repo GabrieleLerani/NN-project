@@ -3,45 +3,63 @@ from torchvision.datasets import MNIST
 from torch.utils.data import random_split, DataLoader
 from torchvision import transforms
 import torch
-
+import matplotlib.pyplot as plt
 
 class MnistDataModule(L.LightningDataModule):
     def __init__(self, data_dir: str = "path/to/dir", batch_size: int = 32, type: str = "mnist"):
         super().__init__()
         self.data_dir = data_dir
         self.batch_size = batch_size
-        self.in_channels = 1
-        self.out_channels = 10
-        if type == "mnist":
+        self.type = type
+
+        self.prepare_data()
+
+    def prepare_data(self):
+        # download
+        train = MNIST(self.data_dir, train=True, download=True)
+        MNIST(self.data_dir, train=False, download=True)
+        
+        # set out channels
+        self.out_channels = len(train.classes)
+        
+        transform = transforms.Compose([transforms.ToTensor()])
+
+        # set in channels
+        self.in_channels = transform(train[0][0]).shape[0]
+        
+        # set size of the image
+        self.size = train[0][0].size[0] * train[0][0].size[1]
+        
+        self._set_transform()
+
+        
+
+    def _set_transform(self):
+
+        if self.type == "mnist":
             self.transform = transforms.ToTensor()
-        if type == "smnist":
+        if self.type == "smnist":
             self.transform = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Lambda(lambda x: x.view(-1)) # flatten the image to 784 pixels
                   
             ])
 
-        if type == "pmnist":
+        if self.type == "pmnist":
             self.transform = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Lambda(lambda x: x.view(-1)),  
-                transforms.Lambda(lambda x: x[torch.randperm(784)] )  # permutation of the 784 pixels
+                transforms.Lambda(lambda x: x[torch.randperm(self.size)] )  # permutation of the 784 pixels
             ])
-
-
-    def prepare_data(self):
-        # download
-        MNIST(self.data_dir, train=True, download=True)
-        MNIST(self.data_dir, train=False, download=True)
 
 
 
     def setup(self, stage: str):
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
-            mnist_full = MNIST(self.data_dir, train=True)
+            self.mnist_full = MNIST(self.data_dir, train=True)
             self.mnist_train, self.mnist_val = random_split(
-                mnist_full, [55000, 5000], generator=torch.Generator().manual_seed(42)
+                self.mnist_full, [55000, 5000], generator=torch.Generator().manual_seed(42)
             )
             print(f'Training set size: {len(self.mnist_train)}')
             print(f'Validation set size: {len(self.mnist_val)}')
@@ -72,9 +90,23 @@ class MnistDataModule(L.LightningDataModule):
         ...
 
 
+    def show_samples(self, num_samples: int = 5):
+        dataset = self.mnist_full
+        fig, axes = plt.subplots(1, num_samples, figsize=(15, 3))
+        for i in range(num_samples):
+            image, label = dataset[i]
+            #image = image.permute(1, 2, 0)  # Convert from (C, H, W) to (H, W, C)
+            axes[i].imshow(image)
+            axes[i].set_title(f'Label: {label}')
+            axes[i].axis('off')
+        plt.show()
+
+
 if __name__ == "__main__":
-    mnist = MnistDataModule("ckconv/data/datasets",32)
-    mnist.prepare_data()
-    mnist.setup("predict")
+    mnist = MnistDataModule("data/datasets",32)
+    
+    mnist.setup("fit")
+    mnist.show_samples(3)
+    
     
     

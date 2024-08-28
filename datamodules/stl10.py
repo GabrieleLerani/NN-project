@@ -10,18 +10,26 @@ class STL10DataModule(L.LightningDataModule):
         super().__init__()
         self.data_dir = data_dir
         self.batch_size = batch_size
-        self.in_channels = 3
-        self.out_channels = 10
-
         self.transform = transforms.ToTensor()
 
 
     def prepare_data(self):
         # download
-        STL10(self.data_dir, split="train", download=True)
+        train = STL10(self.data_dir, split="train", download=True)
         STL10(self.data_dir, split="test", download=True)
 
+        # set out channels
+        self.out_channels = len(train.classes)
+        
+        transform = transforms.Compose([transforms.ToTensor()])
 
+        # set in channels
+        self.in_channels = transform(train[0][0]).shape[0]
+
+        # set size of the image
+        self.size = train[0][0].size[0] * train[0][0].size[1]
+        
+        
 
     def setup(self, stage: str):
         # Assign train/val datasets for use in dataloaders
@@ -71,7 +79,7 @@ class STL10DataModule(L.LightningDataModule):
 
 if __name__ == "__main__":
     dm = STL10DataModule()
-    dm.prepare_data()
+    
     dm.setup("fit")
 
     dm.setup("test")
