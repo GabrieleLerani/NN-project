@@ -87,7 +87,7 @@ class MFN(nn.Module):
 
 class MAGNet(MFN):
     def __init__(
-        self, data_dim: int, hidden_channels: int, out_channels: int, no_layers: int
+        self, data_dim: int, hidden_channels: int, out_channels: int, no_layers: int, omega_0: float
     ):
         """
         TODO
@@ -99,6 +99,7 @@ class MAGNet(MFN):
                     data_dim=data_dim,
                     hidden_channels=hidden_channels,
                     current_layer=l,
+                    omega_0=omega_0,
                 )
                 for l in range(no_layers)
             ]
@@ -111,6 +112,7 @@ class AnisotropicGaborLayer(nn.Module):
         data_dim: int,
         hidden_channels: int,
         current_layer: int,
+        omega_0: float = 2976.49,
         alpha: float = 6.0,
         beta: float = 1.0,
     ):
@@ -155,7 +157,7 @@ class AnisotropicGaborLayer(nn.Module):
         scaling_factor = 25.6
 
         self.linear.weight = nn.Parameter(torch.randn(hidden_channels,data_dim,*((1,) * data_dim)))
-        self.linear.weight.data *= scaling_factor * self.gamma[0].view(
+        self.linear.weight.data *= omega_0 * scaling_factor * self.gamma[0].view(
             *self.gamma[0].shape, *((1,) * data_dim)
         )
 
