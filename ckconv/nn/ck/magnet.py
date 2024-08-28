@@ -166,7 +166,7 @@ class AnisotropicGaborLayer(nn.Module):
         """
         TODO
         """
-        print(x.shape)
+
         # coordinates (x,y,...)
         coord = [x[0][i] for i in range(self.data_dim)]
 

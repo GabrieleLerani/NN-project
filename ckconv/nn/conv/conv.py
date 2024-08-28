@@ -58,7 +58,7 @@ def conv(
     kernel: torch.Tensor,
     bias: Optional[torch.Tensor] = None,
 ):
-    
+
     data_dim = len(x.shape) - 2
     # -> [batch_size, channels, x_dimension, y_dimension, ...] -> len[x.shape] = 2 + data_dim
 

@@ -1,6 +1,6 @@
 net:
-  data_dim: 2
-  in_channels: 3
+  data_dim: 1
+  in_channels: 1
   out_channels: 10
   hidden_channels: 140
   no_blocks: 4
@@ -12,22 +12,22 @@ kernel:
   kernel_size: 33
   conv_type: "conv"
   fft_threshold: 50
+  omega_0: 20
 
 # TODO
 train:
-  accelerator: "gpu"
-  devices: [0]
+  accelerator: "cpu"
+  devices: auto
   warmup_epochs: 10
-  epochs : 210
-  learning_rate : 0.01
-  batch_size : 10
+  epochs: 210
+  learning_rate: 0.01
+  batch_size: 10
   start_factor: 1e-6
   end_factor: 1.0
-  loss_fn: "crossEntropy"
-  optimizer: "adamW"
+  loss_fn: "cross_entropy"
+  optimizer: "AdamW"
   dropout_rate: 10
   weight_decay: 1e-4
-  w0: 20
 
 test:
   epochs : 20
@@ -49,10 +49,10 @@ devices:
 # Comment the two sections below to make hydra generate the files again
 defaults:  
   - _self_  
-  - override hydra/hydra_logging: disabled  
+  - override hydra/hydra_logging: disabled
   - override hydra/job_logging: disabled
 
-hydra:  
-  output_subdir: null  
-  run:  
+hydra:
+  output_subdir: null
+  run:
     dir: .

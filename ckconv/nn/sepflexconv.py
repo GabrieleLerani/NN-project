@@ -213,9 +213,6 @@ class SepFlexConv(nn.Module):
         """
         
         masked_kernel = self.construct_masked_kernel(x)
-        print("x shape: ", x.shape)
-        print("Conv kernel shape: ", masked_kernel.shape)
-        
 
         size = torch.tensor(masked_kernel.shape[2:]) # -> [33,33] for data_dim=2
         # fftconv is used when the size of the kernel is large enough
@@ -224,7 +221,6 @@ class SepFlexConv(nn.Module):
         else:
             out = simple_conv(x=x, kernel=masked_kernel, bias=self.bias)
 
-        print("Spatial conv shape: ", out.shape)
         # pointwise convolution where out is the spatial convolution
         out = self.pointwise_conv(out)
     

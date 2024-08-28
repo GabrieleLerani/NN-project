@@ -110,14 +110,13 @@ class CCNN(pl.LightningModule):
     
     def _common_step(self, batch, batch_idx):
         x, y = batch
-        x = x.reshape(x.size(0), -1)
         scores = self.forward(x)
         loss = F.cross_entropy(scores, y)
         return loss, scores, y
     
     def configure_optimizers(self):
         # Define the optimizer (AdamW)
-        optimizer = optim.adamw(self.parameters(), lr=self.learning_rate)
+        optimizer = optim.AdamW(self.parameters(), lr=self.learning_rate)
 
         # Define the linear learning rate warm-up for 10 epochs
         linear_warmup = optim.lr_scheduler.LinearLR(optimizer=optimizer, start_factor=self.start_factor, end_factor=self.end_factor, total_iters=self.warmup_epochs)
