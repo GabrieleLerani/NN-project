@@ -92,6 +92,7 @@ class SepFlexConv(nn.Module):
             hidden_channels=kernel_hidden_channels,
             out_channels=in_channels, # always in channel because separable
             no_layers=kernel_no_layers,
+            omega_0=kernel_cfg.omega_0,
         )
         
         # Define the pointwise convolution layer (page 4 original paper)
