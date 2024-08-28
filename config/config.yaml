@@ -23,10 +23,14 @@ kernel:
 
 # TODO
 train:
-  warm_up_epochs: 10
-  epochs : 20
-  learning_rate : 3e-4
+  accelerator: "gpu"
+  devices: [0]
+  warmup_epochs: 10
+  epochs : 210
+  learning_rate : 0.01
   batch_size : 10
+  start_factor: 1e-6
+  end_factor: 1.0
   loss_fn: "crossEntropy"
   optimizer: "adamW"
   dropout_rate: 10
@@ -38,11 +42,11 @@ test:
   batch_size : 10
 
 data:
-  data_dir : "/Users/applem2/Downloads/NN/NN-project/data/datasets"
+  data_dir : "/data/datasets"
 
 dump:
-  weights_path: "/Users/applem2/Downloads/NN/NN-project/results/checkpoints/weights"
-  model_path: "/Users/applem2/Downloads/NN/NN-project/results/checkpoints/model"
+  weights_path: "/results/checkpoints/weights"
+  model_path: "/results/checkpoints/model"
 
 devices:
   cuda: "cuda"

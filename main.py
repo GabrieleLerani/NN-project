@@ -1,18 +1,13 @@
 import torch
-
-from data import Loader
-import torchvision.transforms as transforms
-
 import hydra
+import pytorch_lightning as pl
 from omegaconf import OmegaConf
 from models import CCNN
+from datamodules import MnistDataModule
 
 # In order for Hydra to generate again the files, go to config/config.yaml and look for defaults: and hydra:
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: OmegaConf) -> None:
-    print(OmegaConf.to_yaml(cfg))
-    
-    x = torch.ones(size=(8, cfg.net.in_channels, *(32,) * cfg.net.data_dim)).float()
 
     model = CCNN(
         in_channels=cfg.net.in_channels, # TODO in channels and out should be determined from dataset see datamodule
@@ -21,9 +16,12 @@ def main(cfg: OmegaConf) -> None:
         cfg=cfg
     )
 
-    x = model(x)
+    datamodule = MnistDataModule("ckconv/data/datasets", 32, "smnist")
 
-    print(x.shape)
+    trainer = pl.Trainer(accelerator=cfg.train.accelerator, devices=cfg.train.devices, min_epochs=1, max_epochs=cfg.train.epochs)
+    trainer.fit(model, datamodule)
+    trainer.validate(model, datamodule)
+    trainer.test(model, datamodule)
 
 
 if __name__ == "__main__":
