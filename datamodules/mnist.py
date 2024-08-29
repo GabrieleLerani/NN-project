@@ -7,29 +7,19 @@ import matplotlib.pyplot as plt
 from omegaconf import OmegaConf
 
 class MnistDataModule(L.LightningDataModule):
-    def __init__(self, data_dir, type, cfg):
+    def __init__(self, cfg, data_dir : str = "data/datasets"):
         super().__init__()
         self.data_dir = data_dir
-        self.type = type
+        self.type = cfg.data.dataset
         self.cfg = cfg
         self.num_workers = 7
 
 
     def prepare_data(self):
         # download
-        train = MNIST(self.data_dir, train=True, download=True)
+        MNIST(self.data_dir, train=True, download=True)
         MNIST(self.data_dir, train=False, download=True)
         
-        # set out channels
-        self.out_channels = len(train.classes)
-        
-        transform = transforms.ToTensor()
-
-        # set in channels
-        self.in_channels = transform(train[0][0]).shape[0]
-        
-        # set size of the image
-        self.size = train[0][0].size[0] * train[0][0].size[1]
         
     
     def _set_transform(self):

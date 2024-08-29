@@ -3,35 +3,54 @@ from torchvision.datasets import STL10
 from torch.utils.data import random_split, DataLoader
 import torch
 from torchvision import transforms
+from omegaconf import OmegaConf
 import matplotlib.pyplot as plt
 
+
 class STL10DataModule(L.LightningDataModule):
-    def __init__(self, data_dir: str = "data/datasets/", batch_size: int = 32):
+    def __init__(self, cfg, data_dir : str = "data/datasets"):
         super().__init__()
         self.data_dir = data_dir
-        self.batch_size = batch_size
+        self.cfg = cfg
+        self.num_workers = 7
         self.transform = transforms.ToTensor()
 
 
     def prepare_data(self):
         # download
-        train = STL10(self.data_dir, split="train", download=True)
+        STL10(self.data_dir, split="train", download=True)
         STL10(self.data_dir, split="test", download=True)
 
-        # set out channels
-        self.out_channels = len(train.classes)
         
-        transform = transforms.Compose([transforms.ToTensor()])
 
-        # set in channels
-        self.in_channels = transform(train[0][0]).shape[0]
+    def _yaml_parameters(self):
+        hidden_channels = self.cfg.net.hidden_channels
 
-        # set size of the image
-        self.size = train[0][0].size[0] * train[0][0].size[1]
-        
-        
+        OmegaConf.update(self.cfg, "train.batch_size", 64)
+        OmegaConf.update(self.cfg, "train.epochs", 210)
+        OmegaConf.update(self.cfg, "net.in_channels", 3)
+        OmegaConf.update(self.cfg, "net.out_channels", 10)
+        OmegaConf.update(self.cfg, "net.data_dim", 2)
+        OmegaConf.update(self.cfg, "kernel.omega_0", 954.28)
+        OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
+
+        if hidden_channels == 140:
+            OmegaConf.update(self.cfg, "train.learning_rate", 0.02)            
+            OmegaConf.update(self.cfg, "train.weight_decay", 0)
+            
+            
+        elif hidden_channels == 380:
+            OmegaConf.update(self.cfg, "train.learning_rate", 0.01)            
+            OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
+            
+            
 
     def setup(self, stage: str):
+
+        self._yaml_parameters()
+
+        self.batch_size = self.cfg.train.batch_size
+
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
             stl10_full = STL10(self.data_dir, split="train", transform=self.transform)
@@ -51,16 +70,28 @@ class STL10DataModule(L.LightningDataModule):
             print(f'Prediction set size: {len(self.stl10_predict)}')
 
     def train_dataloader(self):
-        return DataLoader(self.stl10_train, batch_size=self.batch_size)
+        return DataLoader(self.stl10_train,
+                          batch_size=self.batch_size,
+                          num_workers=self.num_workers,
+                          shuffle=False)
 
     def val_dataloader(self):
-        return DataLoader(self.stl10_val, batch_size=self.batch_size)
+        return DataLoader(self.stl10_val,
+                          batch_size=self.batch_size,
+                          num_workers=self.num_workers,
+                          shuffle=False)
 
     def test_dataloader(self):
-        return DataLoader(self.stl10_test, batch_size=self.batch_size)
+        return DataLoader(self.stl10_test,
+                          batch_size=self.batch_size,
+                          num_workers=self.num_workers,
+                          shuffle=False)
 
     def predict_dataloader(self):
-        return DataLoader(self.stl10_predict, batch_size=self.batch_size)
+        return DataLoader(self.stl10_predict,
+                          batch_size=self.batch_size,
+                          num_workers=self.num_workers,
+                          shuffle=False)
 
     def teardown(self, stage: str):
         # Used to clean-up when the run is finished

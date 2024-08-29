@@ -1,4 +1,5 @@
 from torch import nn, optim
+import torch
 import pytorch_lightning as pl
 import torch.nn.functional as F
 import torchmetrics
@@ -107,7 +108,13 @@ class CCNN(pl.LightningModule):
         loss, scores, y = self._common_step(batch, batch_idx)
         self.log('test_loss', loss)
         return loss
-    
+
+    def predict_step(self, batch, batch_idx, dataloader_idx=None):
+        x, y = batch
+        scores = self.forward(x)
+        preds = torch.argmax(scores, dim=1)
+        return preds
+
     def _common_step(self, batch, batch_idx):
         x, y = batch
         scores = self.forward(x)

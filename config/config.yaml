@@ -34,7 +34,8 @@ test:
   batch_size : 10
 
 data:
-  data_dir : "/data/datasets"
+  data_dir : "datasets"
+  dataset : "MNIST"
 
 dump:
   weights_path: "/results/checkpoints/weights"

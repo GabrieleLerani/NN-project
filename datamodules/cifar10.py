@@ -7,28 +7,19 @@ import matplotlib.pyplot as plt
 from omegaconf import OmegaConf
 
 class Cifar10DataModule(L.LightningDataModule):
-    def __init__(self, data_dir, type, cfg):
+    def __init__(self, cfg, data_dir : str = "data/datasets"):
         super().__init__()
         self.data_dir = data_dir
-        self.type = type
+        self.type = cfg.data.dataset
         self.cfg = cfg
         self.num_workers = 7
 
 
     def prepare_data(self):
         # download
-        train = CIFAR10(self.data_dir, train=True, download=True)
+        CIFAR10(self.data_dir, train=True, download=True)
         CIFAR10(self.data_dir, train=False, download=True)
 
-        # set out channels
-        self.out_channels = len(train.classes)
-        
-        transform = transforms.Compose([transforms.ToTensor()])
-
-        # set in channels
-        self.in_channels = transform(train[0][0]).shape[0]
-
-        self.size = train[0][0].size[0] * train[0][0].size[1]
         
 
     def _set_transform(self):
@@ -37,7 +28,7 @@ class Cifar10DataModule(L.LightningDataModule):
                 transforms.ToTensor()
         ])
 
-        if self.type == "scifar":
+        if self.type == "scifar10":
             self.transform.transforms.append(transforms.Lambda(lambda x: x.view(-1))) # flatten the image to 1024 pixels
 
 
@@ -46,18 +37,18 @@ class Cifar10DataModule(L.LightningDataModule):
 
         OmegaConf.update(self.cfg, "train.batch_size", 50)
         OmegaConf.update(self.cfg, "train.epochs", 210)
-        OmegaConf.update(self.cfg, "net.in_channels", 3)
+        OmegaConf.update(self.cfg, "net.in_channels", 1)
         OmegaConf.update(self.cfg, "net.out_channels", 10)
 
         if hidden_channels == 140:
             OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
 
-            if self.type == "cifar":
+            if self.type == "cifar10":
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
                 OmegaConf.update(self.cfg, "train.weight_decay", 0.0001)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 1435.77)
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
-            elif self.type == "scifar":
+            elif self.type == "scifar10":
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.0)
                 OmegaConf.update(self.cfg, "train.weight_decay", 0)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2386.49)
@@ -65,12 +56,12 @@ class Cifar10DataModule(L.LightningDataModule):
         elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
 
-            if self.type == "cifar":
+            if self.type == "cifar10":
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.15)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 1435.77)
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
-            elif self.type == "scifar":
+            elif self.type == "scifar10":
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.25)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 4005.15)
@@ -81,7 +72,7 @@ class Cifar10DataModule(L.LightningDataModule):
         self._set_transform()
         self._yaml_parameters()
 
-        self.batch_size = self.cfg.batch_size
+        self.batch_size = self.cfg.train.batch_size
 
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
