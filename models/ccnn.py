@@ -74,6 +74,7 @@ class CCNN(pl.LightningModule):
         # pointwise linear convolutional layer
         self.pointwise_linear_layer = LinearLayer(data_dim, hidden_channels, out_channels)
 
+        # define accuracy
         self.accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=out_channels)
         self.f1_score = torchmetrics.F1Score(task="multiclass", num_classes=out_channels)
 
