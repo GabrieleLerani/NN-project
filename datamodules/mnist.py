@@ -20,7 +20,6 @@ class MnistDataModule(L.LightningDataModule):
         MNIST(self.data_dir, train=True, download=True)
         MNIST(self.data_dir, train=False, download=True)
         
-        
     
     def _set_transform(self):
         self.transform = transforms.Compose([
@@ -136,6 +135,3 @@ if __name__ == "__main__":
     
     mnist.setup("fit")
     mnist.show_samples(3)
-    
-    
-    

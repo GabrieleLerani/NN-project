@@ -5,11 +5,12 @@ from omegaconf import OmegaConf
 from models import CCNN
 from datamodules import get_data_module
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from pytorch_lightning.loggers import TensorBoardLogger
 
 # In order for Hydra to generate again the files, go to config/config.yaml and look for defaults: and hydra:
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: OmegaConf) -> None:
-    
+    logger = TensorBoardLogger("lightning_logs", name=f"{cfg.data.dataset}_{cfg.net.hidden_channels}")
 
     # get the corresponding lightning datamodule
     datamodule = get_data_module(cfg)
@@ -36,6 +37,7 @@ def main(cfg: OmegaConf) -> None:
 
     # create the trainer
     trainer = pl.Trainer(
+        logger=logger,
         accelerator=cfg.train.accelerator,
         devices=cfg.train.devices,
         max_epochs=cfg.train.epochs,

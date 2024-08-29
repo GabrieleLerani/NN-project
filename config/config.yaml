@@ -35,7 +35,7 @@ test:
 
 data:
   data_dir : "datasets"
-  dataset : "MNIST"
+  dataset : "smnist"
 
 dump:
   weights_path: "/results/checkpoints/weights"
