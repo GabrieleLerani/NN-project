@@ -14,10 +14,15 @@ kernel:
   fft_threshold: 50
   omega_0: 20
 
-# TODO
+
+pre_trained: False
+
 train:
+  logger: True
+  callbacks: True
+  profiler: True
   accelerator: "cpu"
-  devices: auto
+  devices: "auto"
   warmup_epochs: 10
   epochs: 210
   learning_rate: 0.01

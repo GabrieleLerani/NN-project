@@ -172,7 +172,7 @@ class AnisotropicGaborLayer(nn.Module):
         # coordinates (x,y,...)
         coord = [x[0][i] for i in range(self.data_dim)]
 
-        # reshaping the parameters
+        # reshaping the parameters to [1, 1, 1, W, H] if data_dim = 2
         reshaped_coord = [c.view(1, 1, 1, *c.shape) for c in coord]
 
         reshaped_gamma = [

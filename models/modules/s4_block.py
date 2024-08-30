@@ -49,14 +49,21 @@ class S4Block(nn.Module):
             kernel_cfg=kernel_cfg
         )
         
-        self.gelu_layer1 = nn.GELU()
+        self.gelu_layer = [nn.GELU(), nn.GELU()]
 
         self.dropout_layer = GetDropout(data_dim=data_dim)
 
         # pointwise linear convolutional layer
         self.pointwise_linear_layer = LinearLayer(data_dim, in_channels, out_channels)
 
-        self.gelu_layer2 = nn.GELU()
+        self.seq_modules = nn.Sequential(
+            self.batch_norm_layer,
+            self.sep_flex_conv_layer,
+            self.gelu_layer[0],
+            self.dropout_layer,
+            self.pointwise_linear_layer,
+            self.gelu_layer[1]
+        )
 
         # Used in residual networks (ResNets) to add a direct path from the input to the output, 
         # which helps in training deeper networks by mitigating the vanishing gradient problem.
@@ -75,17 +82,5 @@ class S4Block(nn.Module):
         Standard method of nn.modules we embed also the residual connection
         """
         shortcut = self.shortcut(x)
-
-        out = self.gelu_layer2(
-            self.pointwise_linear_layer(
-                self.dropout_layer(
-                    self.gelu_layer1(
-                        self.sep_flex_conv_layer(
-                            self.batch_norm_layer(x)
-                        )
-                    )
-                )
-            )
-        )
-
+        out = self.seq_modules(x)
         return out + shortcut

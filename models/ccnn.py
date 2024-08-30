@@ -15,23 +15,7 @@ class CCNN(pl.LightningModule):
     """
     CCNN architecture (Romero et al., 2022) as defined in the original paper.
 
-          input
-            |
-        SepFlexConv
-            |
-        BatchNorm
-            |
-           GELU
-            |
-        L x S4Block
-            |
-        BatchNorm
-            |
-        GlobalAvgPool
-            |
-        PointwiseLinear
-            |
-          output
+    input --> SepFlexConv --> BatchNorm --> GELU --> L x S4Block --> BatchNorm --> GlobalAvgPool -->PointwiseLinear --> output
     """
     def __init__(
         self,  
@@ -59,7 +43,10 @@ class CCNN(pl.LightningModule):
             kernel_cfg=cfg.kernel
         )
         # batch normalization layer
-        self.batch_norm_layer_1 = GetBatchNormalization(data_dim=data_dim, num_features=hidden_channels)
+        self.batch_norm_layer = [
+            GetBatchNormalization(data_dim=data_dim, num_features=hidden_channels),
+            GetBatchNormalization(data_dim=data_dim, num_features=hidden_channels)
+        ]
         # gelu layer
         self.gelu_layer = nn.GELU()
         # s4blocks
@@ -67,28 +54,31 @@ class CCNN(pl.LightningModule):
         for _ in range(self.no_blocks):
             s4 = S4Block(in_channels=hidden_channels, out_channels=hidden_channels, data_dim=data_dim, net_cfg=cfg.net, kernel_cfg=cfg.kernel)
             self.blocks.append(s4)
-        # batch normalization layer
-        self.batch_norm_layer_2 = GetBatchNormalization(data_dim=data_dim, num_features=hidden_channels)
+        
+        
         # global average pooling layer (the information of each channel is compressed into a single value)
         self.global_avg_pool_layer = GetAdaptiveAvgPool(data_dim=data_dim, output_size=(1,) * data_dim)
         # pointwise linear convolutional layer
         self.pointwise_linear_layer = LinearLayer(data_dim, hidden_channels, out_channels)
 
-        # define accuracy
+        # define sequencial modules
+        self.seq_modules = nn.Sequential(
+            self.sep_flex_conv_layer,
+            self.batch_norm_layer[0],
+            self.gelu_layer,
+            *self.blocks,
+            self.batch_norm_layer[1],
+            self.global_avg_pool_layer,
+            self.pointwise_linear_layer
+        )
+
+        # define metrics
         self.accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=out_channels)
         self.f1_score = torchmetrics.F1Score(task="multiclass", num_classes=out_channels)
 
     def forward(self, x):
-        out = self.gelu_layer(
-            self.batch_norm_layer_1(
-                self.sep_flex_conv_layer(x)
-            )
-        )
-
-        for i in range(self.no_blocks):
-            out = self.blocks[i](out)
         
-        out = self.pointwise_linear_layer(self.global_avg_pool_layer(self.batch_norm_layer_2(out)))
+        out = self.seq_modules(x)
 
         return out.squeeze()
 
@@ -97,22 +87,36 @@ class CCNN(pl.LightningModule):
         loss, scores, y = self._common_step(batch, batch_idx)
         accuracy = self.accuracy(scores, y)
         f1_score = self.f1_score(scores, y)
-        self.log_dict({'train_loss': loss, 'train_accuracy': accuracy, 'train_f1_score': f1_score}, on_step=False, on_epoch=True, prog_bar=True)
+        metrics_dict = {
+            'train_loss': loss,
+            'train_accuracy': accuracy,
+            'train_f1_score': f1_score,
+            'y': y
+        }
+        self.log_dict(dictionary=metrics_dict, on_step=False, on_epoch=True, prog_bar=True)
         return loss
     
     def validation_step(self, batch, batch_idx):
         loss, scores, y = self._common_step(batch, batch_idx)
         self.log('val_loss', loss)
+        self.log('accuracy', self.accuracy(scores, y))
         return loss
     
     def test_step(self, batch, batch_idx):
         loss, scores, y = self._common_step(batch, batch_idx)
-        self.log('test_loss', loss)
+        
+        metrics_dict = {
+            'loss': loss,
+            'accuracy': self.accuracy(scores, y),
+            
+        }
+        self.log_dict(metrics_dict)
+        #self.log('accuracy', self.accuracy(scores, y))
         return loss
 
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
         x, y = batch
-        scores = self.forward(x)
+        scores = self.seq_modules(x).squeeze()
         preds = torch.argmax(scores, dim=1)
         return preds
 
