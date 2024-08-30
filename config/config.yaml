@@ -40,7 +40,7 @@ test:
 
 data:
   data_dir : "datasets"
-  dataset : "smnist"
+  dataset : "sc_raw"
 
 dump:
   weights_path: "/results/checkpoints/weights"

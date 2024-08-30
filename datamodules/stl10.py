@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 
 class STL10DataModule(L.LightningDataModule):
-    def __init__(self, cfg, data_dir : str = "data/datasets"):
+    def __init__(self, cfg, data_dir : str = "datasets"):
         super().__init__()
         self.data_dir = data_dir
         self.cfg = cfg

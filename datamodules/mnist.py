@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from omegaconf import OmegaConf
 
 class MnistDataModule(L.LightningDataModule):
-    def __init__(self, cfg, data_dir : str = "data/datasets"):
+    def __init__(self, cfg, data_dir : str = "datasets"):
         super().__init__()
         self.data_dir = data_dir
         self.type = cfg.data.dataset
