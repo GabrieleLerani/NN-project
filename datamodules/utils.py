@@ -20,6 +20,9 @@ def get_data_module(cfg : OmegaConf):
     if cfg.data.dataset == "stl10":
         from .stl10 import STL10DataModule
         return STL10DataModule(cfg)
+    if cfg.data.dataset == "sc_mfcc" or cfg.data.dataset == "sc_raw":
+        from .speech import SpeechCommandsModule
+        return SpeechCommandsModule(cfg)
     
     # TODO other dataset
 
@@ -71,3 +74,15 @@ def load_data_from_partition(data_loc, partition):
     name_x, name_y = f"{partition}_x", f"{partition}_y"
     x, y = tensors[name_x], tensors[name_y]
     return x, y
+
+
+def normalise_data(X, y):
+    train_X, _, _ = split_data(X, y)
+    out = []
+    for Xi, train_Xi in zip(X.unbind(dim=-1), train_X.unbind(dim=-1)):
+        train_Xi_nonan = train_Xi.masked_select(~torch.isnan(train_Xi))
+        mean = train_Xi_nonan.mean()  # compute statistics using only training data.
+        std = train_Xi_nonan.std()
+        out.append((Xi - mean) / (std + 1e-5))
+    out = torch.stack(out, dim=-1)
+    return out

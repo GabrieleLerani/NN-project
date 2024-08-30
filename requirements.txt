@@ -13,3 +13,4 @@ datasets
 pytorch-lightning
 torchmetrics
 tensorboard
+PySoundFile

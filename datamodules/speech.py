@@ -2,7 +2,7 @@ import pytorch_lightning as L
 import torchaudio
 from torchaudio.datasets import SPEECHCOMMANDS
 from torch.utils.data import DataLoader, TensorDataset
-from datamodules import split_data, load_data_from_partition, save_data
+from .utils import split_data, load_data_from_partition, save_data, normalise_data
 import torch
 import os
 from omegaconf import OmegaConf
@@ -52,9 +52,27 @@ class SpeechCommandsModule(L.LightningDataModule):
                 batch_index += 1
             y_index += 1
 
+
+        # If MFCC, then we compute these coefficients.
+        if self.type == "sc_mfcc":
+            x = torchaudio.transforms.MFCC(
+                log_mels=True, n_mfcc=20, melkwargs=dict(n_fft=200, n_mels=64)
+            )(x.squeeze(-1)).detach()
+            # X is of shape (batch=34975, channels=20, length=161)
+        else:
+            x = x.unsqueeze(1).squeeze(-1)
+            # X is of shape (batch=34975, channels=1, length=16000)
+
+        # Normalize data
+        if self.type == "sc_mfcc":
+            x = normalise_data(x.transpose(1, 2), y).transpose(1, 2)
+        else:
+            x = normalise_data(x, y)
+
         train_x, val_x, test_x = split_data(x, y)
         train_y, val_y, test_y = split_data(y, y)
 
+        
         return (
             train_x,
             val_x,
@@ -132,25 +150,25 @@ class SpeechCommandsModule(L.LightningDataModule):
 
 
     def train_dataloader(self):
-        return DataLoader(self.sc_train,
+        return DataLoader(self.train_dataset,
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           shuffle=False)
 
     def val_dataloader(self):
-        return DataLoader(self.sc_val,
+        return DataLoader(self.val_dataset,
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           shuffle=False)
     
     def test_dataloader(self):
-        return DataLoader(self.sc_test,
+        return DataLoader(self.test_dataset,
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           shuffle=False)
     
     def predict_dataloader(self):
-        return DataLoader(self.sc_predict,
+        return DataLoader(self.test_dataset,
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           shuffle=False)
