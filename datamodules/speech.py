@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from .utils import split_data, load_data_from_partition, save_data, normalise_data
 import torch
 import os
+from tqdm import tqdm
 from omegaconf import OmegaConf
 
 class SpeechCommandsModule(L.LightningDataModule):
@@ -37,7 +38,7 @@ class SpeechCommandsModule(L.LightningDataModule):
             "go",
         ):
             loc = self.download_location + "/" + foldername
-            for filename in os.listdir(loc):
+            for filename in tqdm(os.listdir(loc)):
                 audio, _ = torchaudio.load(
                     loc + "/" + filename,
                     channels_first=False,
@@ -86,17 +87,18 @@ class SpeechCommandsModule(L.LightningDataModule):
     def prepare_data(self):
         # download
         SPEECHCOMMANDS(self.data_dir, download=True)
-        train_x, val_x, test_x, train_y, val_y, test_y = self.process_data()
+        if not os.path.exists(self.data_processed_location + "/train_x.pt"):
+            train_x, val_x, test_x, train_y, val_y, test_y = self.process_data()
 
-        save_data(
-            self.data_processed_location,
-            train_x=train_x,
-            val_x=val_x,
-            test_x=test_x,
-            train_y=train_y,
-            val_y=val_y,
-            test_y=test_y,
-        )
+            save_data(
+                self.data_processed_location,
+                train_x=train_x,
+                val_x=val_x,
+                test_x=test_x,
+                train_y=train_y,
+                val_y=val_y,
+                test_y=test_y,
+            )
 
     
     def _yaml_parameters(self):

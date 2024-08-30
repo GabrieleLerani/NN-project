@@ -1,5 +1,5 @@
 from omegaconf import OmegaConf
-import sklearn
+import sklearn.model_selection
 import torch
 import os
 
@@ -52,8 +52,10 @@ def split_data(tensor, stratify):
     return train_tensor, val_tensor, test_tensor
 
 def save_data(dir, **tensors):
+    if not os.path.exists(dir):
+        os.makedirs(dir)
     for tensor_name, tensor_value in tensors.items():
-        torch.save(tensor_value, str(dir / tensor_name) + ".pt")
+        torch.save(tensor_value, str(dir + "/" + tensor_name) + ".pt")
 
 
 def load_data(dir):
@@ -61,7 +63,7 @@ def load_data(dir):
     for filename in os.listdir(dir):
         if filename.endswith(".pt"):
             tensor_name = filename.split(".")[0]
-            tensor_value = torch.load(str(dir / filename))
+            tensor_value = torch.load(str(dir + "/" + filename))
             tensors[tensor_name] = tensor_value
     return tensors
 
