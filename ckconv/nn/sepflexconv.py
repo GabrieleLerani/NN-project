@@ -138,6 +138,8 @@ class SepFlexConv(nn.Module):
             mask_sigma=self.mask_sigma,
         )
 
+        
+
         return conv_kernel * mask
 
     def get_rel_positions(self, x):
@@ -213,14 +215,14 @@ class SepFlexConv(nn.Module):
             4. Pointwise convolution -> [64, 140, 32, 32]
         """
         
-        masked_kernel = self.construct_masked_kernel(x)
-
-        size = torch.tensor(masked_kernel.shape[2:]) # -> [33,33] for data_dim=2
+        self.masked_kernel = self.construct_masked_kernel(x)
+        
+        size = torch.tensor(self.masked_kernel.shape[2:]) # -> [33,33] for data_dim=2
         # fftconv is used when the size of the kernel is large enough
         if self.conv_type == "fftconv" and torch.all(size > self.fft_thresold):
-            out = fftconv(x=x, kernel=masked_kernel, bias=self.bias)
+            out = fftconv(x=x, kernel=self.masked_kernel, bias=self.bias)
         else:
-            out = simple_conv(x=x, kernel=masked_kernel, bias=self.bias)
+            out = simple_conv(x=x, kernel=self.masked_kernel, bias=self.bias)
 
         # pointwise convolution where out is the spatial convolution
         out = self.pointwise_conv(out)

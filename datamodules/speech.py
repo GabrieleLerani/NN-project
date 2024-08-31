@@ -17,7 +17,7 @@ class SpeechCommandsModule(L.LightningDataModule):
         self.type = cfg.data.dataset
         self.cfg = cfg
         self.num_workers = 0 # for google colab training
-
+        self._yaml_parameters()
 
     def process_data(self):
         x = torch.empty(34975, 16000, 1)
@@ -122,7 +122,7 @@ class SpeechCommandsModule(L.LightningDataModule):
 
 
     def setup(self, stage: str):
-        self._yaml_parameters()
+        
 
         self.batch_size = self.cfg.train.batch_size
 
