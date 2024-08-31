@@ -7,53 +7,16 @@ from pathlib import Path
 from hydra import utils
 from typing import Optional, Callable, Tuple, Dict, List, cast
 from omegaconf import OmegaConf
+from datasets import load_dataset, DatasetDict
+import torchtext
 
 
-class PathfinderDataset(torch.utils.data.Dataset):
-    """Pathfinder dataset created from a list of images."""
-
-    def __init__(self, transform: Optional[Callable] = None) -> None:
-        """
-        Args:
-            img_list (List[Tuple[str, int]]): List of tuples where each tuple contains
-                an image path and its corresponding label.
-            transform (Optional[Callable]): Optional transformation function or composition of transformations.
-        """
-        self.img_list = img_list
-        self.transform = transform
-
-    def __len__(self) -> int:
-        """Returns the number of samples in the dataset."""
-        return len(self.img_list)
-
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
-        """
-        Args:
-            idx (int): Index of the sample to retrieve.
-
-        Returns:
-            Tuple[torch.Tensor, int]: A tuple where the first element is the image tensor
-                and the second element is the label.
-        """
-        img_path, label = self.img_list[idx]
-        img = Image.open(img_path).convert("RGB")
-
-        if self.transform:
-            img = self.transform(img)
-
-        return img, label
-
-    def create_imagelist(self):
-        # TODO create image list from directories
-        pass
-
-
-class PathFinderDataModule(pl.LightningDataModule):
+class IMDBDataModule(pl.LightningDataModule):
     def __init__(
         self,
         cfg,
         data_dir: str = "datasets",
-        data_type="default",
+        data_type="sequence",  # no other types allowed
     ):
         """
         Resolution in [32,64,128,256]
@@ -64,6 +27,7 @@ class PathFinderDataModule(pl.LightningDataModule):
         super().__init__()
         self.data_dir = data_dir
         self.type = cfg.data.dataset
+        # TODO set via conf or parameter init the parameters required
         self.cfg = cfg
         self.num_workers = 0  # for google colab training
 
@@ -84,27 +48,87 @@ class PathFinderDataModule(pl.LightningDataModule):
         self.output_channels = 2
 
     def prepare_data(self):
-        # download, not required
-        pass
+        # download
+        self.dataset = load_dataset("imdb", cache_dir=self.data_dir)
+        self.dataset = DatasetDict(
+            train=self.dataset["train"], test=self.dataset["test"]
+        )
+        if self.tokenizer_type == "word":
+            self.tokenizer = torchtext.data.utils.get_tokenizer(
+                "spacy", language="en_core_web_sm"
+            )
+        else:  # self.tokenizer_type == 'char'
+            self.tokenizer = list  # Just convert a string to a list of chars
+        # Account for <bos> and <eos> tokens
+        max_length = self.max_length - int(self.append_bos) - int(self.append_eos)
+        tokenize = lambda example: {
+            "tokens": self.tokenizer(example["text"])[:max_length]
+        }
+        self.dataset = dataset.map(
+            tokenize,
+            remove_columns=["text"],
+            keep_in_memory=True,
+            load_from_cache_file=False,
+            num_proc=self.num_workers,
+        )
+        self.vocab = torchtext.vocab.build_vocab_from_iterator(
+            self.dataset["train"]["tokens"],
+            min_freq=self.vocab_min_freq,
+            specials=(
+                ["<pad>", "<unk>"]
+                + (["<bos>"] if self.append_bos else [])
+                + (["<eos>"] if self.append_eos else [])
+            ),
+        )
+        self.vocab.set_default_index(self.vocab["<unk>"])
+
+        numericalize = lambda example: {
+            "input_ids": self.vocab(
+                (["<bos>"] if self.append_bos else [])
+                + example["tokens"]
+                + (["<eos>"] if self.append_eos else [])
+            )
+        }
+        self.dataset = self.dataset.map(
+            numericalize,
+            remove_columns=["tokens"],
+            keep_in_memory=True,
+            load_from_cache_file=False,
+            num_proc=self.num_workers,
+        )
 
     def setup(self, stage=None):
+
         self._set_transform()
-        self._yaml_parameters()  # TODO set correct params
+        self._yaml_parameters()
 
-        self.dataset = PathfinderDataset(self.data_dir, transform=self.transform)
-        # compute lengths
+        self.vocab_size = len(self.vocab)
+        self.dataset.set_format(type="torch", columns=["input_ids", "label"])
 
-        len_dataset = len(self.dataset)
-        val_len = int(self.val_split * len_dataset)
-        test_len = int(self.test_split * len_dataset)
-        train_len = len_dataset - val_len - test_len
-
-        # splits
-        self.train_dataset, self.val_dataset, self.test_dataset = random_split(
-            self.dataset,
-            [train_len, val_len, test_len],
-            generator=torch.Generator().manual_seed(getattr(self, "seed", 42)),
+        # Create all splits
+        self.train_dataset, self.test_dataset = (
+            self.dataset["train"],
+            self.dataset["test"],
         )
+
+        def collate_batch(batch):
+            xs, ys = zip(*[(data["input_ids"], data["label"]) for data in batch])
+            # lengths = torch.tensor([len(x) for x in xs])
+            xs = torch.stack(
+                [
+                    torch.nn.functional.pad(
+                        x,
+                        [self.max_length - x.shape[-1], 0],
+                        value=float(self.vocab["<pad>"]),
+                    )
+                    for x in xs
+                ]
+            )
+            xs = xs.unsqueeze(1).float()
+            ys = torch.tensor(ys)
+            return xs, ys
+
+        self.collate_fn = collate_batch
 
     def _set_transform(self):
 
@@ -155,6 +179,7 @@ class PathFinderDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
             drop_last=True,
+            collate_fn=self.collate_fn,
         )
         return train_dataloader
 
@@ -165,6 +190,7 @@ class PathFinderDataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
+            collate_fn=self.collate_fn,
         )
         return val_dataloader
 
@@ -175,18 +201,9 @@ class PathFinderDataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
+            collate_fn=self.collate_fn,
         )
         return test_dataloader
-
-    def on_before_batch_transfer(self, batch, dataloader_idx):
-        if self.data_type == "sequence":
-            # If sequential, flatten the input [B, C, Y, X] -> [B, C, -1]
-            x, y = batch
-            x_shape = x.shape
-            # Flatten
-            x = x.view(x_shape[0], x_shape[1], -1)
-            batch = x, y
-        return batch
 
 
 if __name__ == "__main__":
