@@ -14,3 +14,4 @@ pytorch-lightning
 torchmetrics
 tensorboard
 PySoundFile
+tqdm

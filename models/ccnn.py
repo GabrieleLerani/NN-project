@@ -90,8 +90,7 @@ class CCNN(pl.LightningModule):
         metrics_dict = {
             'train_loss': loss,
             'train_accuracy': accuracy,
-            'train_f1_score': f1_score,
-            'y': y
+            'train_f1_score': f1_score
         }
         self.log_dict(dictionary=metrics_dict, on_step=False, on_epoch=True, prog_bar=True)
         return loss
