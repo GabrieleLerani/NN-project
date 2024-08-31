@@ -21,7 +21,7 @@ train:
   logger: True
   callbacks: True
   profiler: True
-  accelerator: "cpu"
+  accelerator: "cuda"
   devices: "auto"
   warmup_epochs: 10
   epochs: 210
@@ -33,6 +33,7 @@ train:
   optimizer: "AdamW"
   dropout_rate: 10
   weight_decay: 1e-4
+  max_epoch_no_improvement: 200
 
 test:
   epochs : 20
