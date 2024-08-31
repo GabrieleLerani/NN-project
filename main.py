@@ -53,11 +53,18 @@ def setup_trainer_components(cfg: OmegaConf):
             save_top_k=1,
             mode="max"
         )
-        early_stop_callback = EarlyStopping(monitor="val_loss", patience=cfg.train.max_epoch_no_improvement, verbose=True)
-
-        model_summary_callback = ModelSummary(max_depth=-1)
-        kernel_logger_callback = KernelLogger(filename)
-        callbacks.extend([kernel_logger_callback,model_summary_callback, checkpoint_callback, early_stop_callback])
+        early_stop_callback = EarlyStopping(
+            monitor="val_loss", 
+            patience=cfg.train.max_epoch_no_improvement, 
+            verbose=True
+        )
+        model_summary_callback = ModelSummary(
+            max_depth=-1
+        )
+        kernel_logger_callback = KernelLogger(
+            filename
+        )
+        callbacks.extend([kernel_logger_callback, model_summary_callback, checkpoint_callback, early_stop_callback])
 
     # Setup profiler
     profiler = None
@@ -76,7 +83,11 @@ def create_trainer(cfg: OmegaConf, logger: TensorBoardLogger, callbacks: list, p
         devices=cfg.train.devices,
         max_epochs=cfg.train.epochs,
         callbacks=callbacks,
-        profiler=profiler
+        profiler=profiler,
+        # TODO used for testing
+        #limit_train_batches=3,
+        #limit_val_batches=3,
+        #limit_test_batches=3
     )
 
 def train_and_evaluate(trainer: pl.Trainer, model: CCNN, datamodule, callbacks: list) -> None:

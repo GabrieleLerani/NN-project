@@ -22,7 +22,7 @@ train:
   logger: True
   callbacks: True
   profiler: True
-  accelerator: "cuda"
+  accelerator: "cpu"
   devices: "auto"
   warmup_epochs: 10
   epochs: 210
