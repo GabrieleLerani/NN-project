@@ -5,6 +5,7 @@ net:
   hidden_channels: 140
   no_blocks: 4
   bias: False
+  block_type: "s4"
 
 kernel:
   kernel_no_layers: 4

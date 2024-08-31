@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import torchmetrics
 
 from models.modules import S4Block
+from models.modules import TCNBlock
 from ckconv.nn import SepFlexConv
 from ckconv.nn.ck import LinearLayer
 from models.modules.utils import GetBatchNormalization
@@ -49,11 +50,15 @@ class CCNN(pl.LightningModule):
         ]
         # gelu layer
         self.gelu_layer = nn.GELU()
-        # s4blocks
+        # blocks can be either S4 or TCN
         self.blocks = []
         for _ in range(self.no_blocks):
-            s4 = S4Block(in_channels=hidden_channels, out_channels=hidden_channels, data_dim=data_dim, net_cfg=cfg.net, kernel_cfg=cfg.kernel)
-            self.blocks.append(s4)
+            if cfg.net.type == "s4":
+                s4 = S4Block(in_channels=hidden_channels, out_channels=hidden_channels, data_dim=data_dim, net_cfg=cfg.net, kernel_cfg=cfg.kernel)
+                self.blocks.append(s4)
+            elif cfg.net.type == "tcn":
+                tcn = TCNBlock(in_channels=hidden_channels, out_channels=hidden_channels, data_dim=data_dim, net_cfg=cfg.net, kernel_cfg=cfg.kernel)
+                self.blocks.append(tcn)
         
         
         # global average pooling layer (the information of each channel is compressed into a single value)

@@ -40,24 +40,24 @@ def create_model(cfg: OmegaConf) -> CCNN:
 def setup_trainer_components(cfg: OmegaConf):
     # Setup logger
     logger = None
+    filename = f"{cfg.data.dataset}_{cfg.net.no_blocks}_{cfg.net.hidden_channels}"
     if cfg.train.logger:
-        logger = TensorBoardLogger("tb_logs", name=f"{cfg.data.dataset}_{cfg.net.no_blocks}_{cfg.net.hidden_channels}")
+        logger = TensorBoardLogger("tb_logs", name=filename)
 
     # Setup callbacks
     callbacks = []
     if cfg.train.callbacks:
         checkpoint_callback = ModelCheckpoint(
-            monitor="val_acc",
+            monitor="accuracy",
             dirpath="checkpoints",
             save_top_k=1,
             mode="max"
         )
         early_stop_callback = EarlyStopping(monitor="val_loss", patience=cfg.train.max_epoch_no_improvement, verbose=True)
+
         model_summary_callback = ModelSummary(max_depth=-1)
-        kernel_logger_callback = KernelLogger(f"{cfg.data.dataset}_{cfg.kernel.kernel_no_layers}_{cfg.net.hidden_channels}")
-        callbacks.extend([model_summary_callback, checkpoint_callback, early_stop_callback])
-        if cfg.train.accelerator == "cuda":
-            callbacks.append(kernel_logger_callback)
+        kernel_logger_callback = KernelLogger(filename)
+        callbacks.extend([kernel_logger_callback,model_summary_callback, checkpoint_callback, early_stop_callback])
 
     # Setup profiler
     profiler = None
