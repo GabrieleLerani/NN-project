@@ -7,48 +7,15 @@ from pathlib import Path
 from hydra import utils
 from typing import Optional, Callable, Tuple, Dict, List, cast
 from omegaconf import OmegaConf
+import torchtext
+from datasets import load_dataset, DatasetDict
 
 
-class PathfinderDataset(torch.utils.data.Dataset):
-    """Pathfinder dataset created from a list of images."""
-
-    def __init__(self, transform: Optional[Callable] = None) -> None:
-        """
-        Args:
-            img_list (List[Tuple[str, int]]): List of tuples where each tuple contains
-                an image path and its corresponding label.
-            transform (Optional[Callable]): Optional transformation function or composition of transformations.
-        """
-        self.img_list = self.create_imagelist()
-        self.transform = transform
-
-    def __len__(self) -> int:
-        """Returns the number of samples in the dataset."""
-        return len(self.img_list)
-
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
-        """
-        Args:
-            idx (int): Index of the sample to retrieve.
-
-        Returns:
-            Tuple[torch.Tensor, int]: A tuple where the first element is the image tensor
-                and the second element is the label.
-        """
-        img_path, label = self.img_list[idx]
-        img = Image.open(img_path).convert("RGB")
-
-        if self.transform:
-            img = self.transform(img)
-
-        return img, label
-
-    def create_imagelist(self) -> List[Tuple[str, int]]:
-        # TODO create image list from directories
-        pass
+def listops_tokenizer(s):
+    return s.translate({ord("]"): ord("X"), ord("("): None, ord(")"): None}).split()
 
 
-class PathFinderDataModule(pl.LightningDataModule):
+class ListOpsDataModule(pl.LightningDataModule):
     def __init__(
         self,
         cfg,
@@ -85,13 +52,58 @@ class PathFinderDataModule(pl.LightningDataModule):
 
     def prepare_data(self):
         # download, not required
-        pass
+        dataset = load_dataset(
+            "csv",
+            data_files={
+                "train": str(self.data_dir / "basic_train.tsv"),
+                "val": str(self.data_dir / "basic_val.tsv"),
+                "test": str(self.data_dir / "basic_test.tsv"),
+            },
+            delimiter="\t",
+            keep_in_memory=True,
+        )
+
+        tokenizer = listops_tokenizer
+        # Account for <bos> and <eos> tokens
+        max_length = self.max_length - int(self.append_bos) - int(self.append_eos)
+        tokenize = lambda example: {"tokens": tokenizer(example["Source"])[:max_length]}
+        dataset = dataset.map(
+            tokenize,
+            remove_columns=["Source"],
+            keep_in_memory=True,
+            load_from_cache_file=False,
+            num_proc=self.num_workers,
+        )
+        vocab = torchtext.vocab.build_vocab_from_iterator(
+            dataset["train"]["tokens"],
+            specials=(
+                ["<pad>", "<unk>"]
+                + (["<bos>"] if self.append_bos else [])
+                + (["<eos>"] if self.append_eos else [])
+            ),
+        )
+        vocab.set_default_index(vocab["<unk>"])
+
+        numericalize = lambda example: {
+            "input_ids": vocab(
+                (["<bos>"] if self.append_bos else [])
+                + example["tokens"]
+                + (["<eos>"] if self.append_eos else [])
+            )
+        }
+        dataset = dataset.map(
+            numericalize,
+            remove_columns=["tokens"],
+            keep_in_memory=True,
+            load_from_cache_file=False,
+            num_proc=self.num_workers,
+        )
+
+        self._save_to_cache(dataset, tokenizer, vocab)
 
     def setup(self, stage=None):
-        self._set_transform()
-        self._yaml_parameters()  # TODO set correct params
 
-        self.dataset = PathfinderDataset(self.data_dir, transform=self.transform)
+        self.dataset = IMDBDataset(self.data_dir, transform=self.transform)
         # compute lengths
 
         len_dataset = len(self.dataset)
@@ -105,6 +117,41 @@ class PathFinderDataModule(pl.LightningDataModule):
             [train_len, val_len, test_len],
             generator=torch.Generator().manual_seed(getattr(self, "seed", 42)),
         )
+
+    def setup(self, stage=None):
+        self._set_transform()
+        self._yaml_parameters()  # TODO set correct params
+
+        dataset, self.tokenizer, self.vocab = self.process_dataset()
+        self.vocab_size = len(self.vocab)
+        dataset.set_format(type="torch", columns=["input_ids", "Target"])
+
+        # Create all splits
+        self.train_dataset, self.val_dataset, self.test_dataset = (
+            dataset["train"],
+            dataset["val"],
+            dataset["test"],
+        )
+
+        def collate_batch(batch):
+            xs, ys = zip(*[(data["input_ids"], data["Target"]) for data in batch])
+            # lengths = torch.tensor([len(x) for x in xs])
+            xs = torch.stack(
+                [
+                    torch.nn.functional.pad(
+                        x,
+                        [self.max_length - x.shape[-1], 0],
+                        value=float(self.vocab["<pad>"]),
+                    )
+                    for x in xs
+                ]
+            )
+            xs = xs.unsqueeze(1).float()
+            # xs = nn.utils.rnn.pad_sequence(xs, padding_value=self.vocab['<pad>'], batch_first=True)
+            ys = torch.tensor(ys)
+            return xs, ys
+
+        self.collate_fn = collate_batch
 
     def _set_transform(self):
 
@@ -146,7 +193,6 @@ class PathFinderDataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2985.63)
 
-    # we define a separate DataLoader for each of train/val/test
     def train_dataloader(self):
         train_dataloader = DataLoader(
             self.train_dataset,
@@ -155,6 +201,7 @@ class PathFinderDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
             drop_last=True,
+            collate_fn=self.collate_fn,
         )
         return train_dataloader
 
@@ -165,6 +212,7 @@ class PathFinderDataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
+            collate_fn=self.collate_fn,
         )
         return val_dataloader
 
@@ -175,18 +223,9 @@ class PathFinderDataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
+            collate_fn=self.collate_fn,
         )
         return test_dataloader
-
-    def on_before_batch_transfer(self, batch, dataloader_idx):
-        if self.data_type == "sequence":
-            # If sequential, flatten the input [B, C, Y, X] -> [B, C, -1]
-            x, y = batch
-            x_shape = x.shape
-            # Flatten
-            x = x.view(x_shape[0], x_shape[1], -1)
-            batch = x, y
-        return batch
 
 
 if __name__ == "__main__":
