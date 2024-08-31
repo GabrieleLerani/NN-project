@@ -1,3 +1,0 @@
-## Overview
-
-This folder should contain the src scripts used for training,testing,preprocessing etc...
