@@ -14,7 +14,7 @@ class STL10DataModule(L.LightningDataModule):
         self.cfg = cfg
         self.num_workers = 0 # for google colab training
         self.transform = transforms.ToTensor()
-
+        self._yaml_parameters()
 
     def prepare_data(self):
         # download
@@ -47,15 +47,13 @@ class STL10DataModule(L.LightningDataModule):
 
     def setup(self, stage: str):
 
-        self._yaml_parameters()
-
         self.batch_size = self.cfg.train.batch_size
 
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
             stl10_full = STL10(self.data_dir, split="train", transform=self.transform)
             self.stl10_train, self.stl10_val = random_split(
-                stl10_full, [4500, 500], generator=torch.Generator().manual_seed(42)
+                stl10_full, [4500, 500], generatorgenerator=torch.Generator(self.cfg.train.accelerator).manual_seed(42)
             )
             print(f'Training set size: {len(self.stl10_train)}')
             print(f'Validation set size: {len(self.stl10_val)}')

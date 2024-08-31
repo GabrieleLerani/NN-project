@@ -13,7 +13,7 @@ class Cifar10DataModule(L.LightningDataModule):
         self.type = cfg.data.dataset
         self.cfg = cfg
         self.num_workers = 0 # for google colab training
-
+        self._yaml_parameters()
 
     def prepare_data(self):
         # download
@@ -37,7 +37,7 @@ class Cifar10DataModule(L.LightningDataModule):
 
         OmegaConf.update(self.cfg, "train.batch_size", 50)
         OmegaConf.update(self.cfg, "train.epochs", 210)
-        OmegaConf.update(self.cfg, "net.in_channels", 1)
+        OmegaConf.update(self.cfg, "net.in_channels", 3)
         OmegaConf.update(self.cfg, "net.out_channels", 10)
 
         if hidden_channels == 140:
@@ -70,15 +70,15 @@ class Cifar10DataModule(L.LightningDataModule):
 
     def setup(self, stage: str):
         self._set_transform()
-        self._yaml_parameters()
+        
 
         self.batch_size = self.cfg.train.batch_size
 
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
-            self.cifar10_full = CIFAR10(self.data_dir, train=True)
+            self.cifar10_full = CIFAR10(self.data_dir, train=True, transform=self.transform)
             self.cifar10_train, self.cifar10_val = random_split(
-                self.cifar10_full, [45000, 5000], generator=torch.Generator().manual_seed(42)
+                self.cifar10_full, [45000, 5000], generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42)
             )
             print(f'Training set size: {len(self.cifar10_train)}')
             print(f'Validation set size: {len(self.cifar10_val)}')
@@ -93,25 +93,25 @@ class Cifar10DataModule(L.LightningDataModule):
             print(f'Prediction set size: {len(self.cifar10_predict)}')
 
     def train_dataloader(self):
-        return DataLoader(self.mnist_train,
+        return DataLoader(self.cifar10_train,
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           shuffle=False)
 
     def val_dataloader(self):
-        return DataLoader(self.mnist_val,
+        return DataLoader(self.cifar10_val,
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           shuffle=False)
     
     def test_dataloader(self):
-        return DataLoader(self.mnist_test,
+        return DataLoader(self.cifar10_test,
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           shuffle=False)
     
     def predict_dataloader(self):
-        return DataLoader(self.mnist_predict,
+        return DataLoader(self.cifar10_predict,
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           shuffle=False)

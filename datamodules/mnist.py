@@ -13,7 +13,7 @@ class MnistDataModule(L.LightningDataModule):
         self.type = cfg.data.dataset
         self.cfg = cfg
         self.num_workers = 0 # for google colab training
-
+        self._yaml_parameters()
 
     def prepare_data(self):
         # download
@@ -66,7 +66,7 @@ class MnistDataModule(L.LightningDataModule):
 
     def setup(self, stage: str):
         self._set_transform()
-        self._yaml_parameters()
+        
 
         self.batch_size = self.cfg.train.batch_size
 
@@ -74,7 +74,7 @@ class MnistDataModule(L.LightningDataModule):
         if stage == "fit":
             self.mnist_full = MNIST(self.data_dir, train=True, transform=self.transform)
             self.mnist_train, self.mnist_val = random_split(
-                self.mnist_full, [55000, 5000], generator=torch.Generator().manual_seed(42)
+                self.mnist_full, [55000, 5000], generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42)
             )
             print(f'Training set size: {len(self.mnist_train)}')
             print(f'Validation set size: {len(self.mnist_val)}')

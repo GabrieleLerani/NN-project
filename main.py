@@ -1,12 +1,14 @@
 import torch
 import hydra
 import pytorch_lightning as pl
+from kernel_logger import KernelLogger
 from omegaconf import OmegaConf
 from models import CCNN
 from datamodules import get_data_module
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
 from pytorch_lightning.profilers import PyTorchProfiler
+
 
 # In order for Hydra to generate again the files, go to config/config.yaml and look for defaults: and hydra:
 @hydra.main(version_base=None, config_path="config", config_name="config")
@@ -19,6 +21,8 @@ def main(cfg: OmegaConf) -> None:
     logger, callbacks, profiler = setup_trainer_components(cfg)
     trainer = create_trainer(cfg, logger, callbacks, profiler)
 
+    print("################# Received configuration: #################")
+    print(OmegaConf.to_yaml(cfg))
     # 4. Train the model or use a pretrained one
     if not cfg.pre_trained:
         train_and_evaluate(trainer, model, datamodule, callbacks)
@@ -48,9 +52,12 @@ def setup_trainer_components(cfg: OmegaConf):
             save_top_k=1,
             mode="max"
         )
-        early_stop_callback = EarlyStopping(monitor="val_loss")
+        early_stop_callback = EarlyStopping(monitor="val_loss", patience=cfg.train.max_epoch_no_improvement, verbose=True)
         model_summary_callback = ModelSummary(max_depth=-1)
+        kernel_logger_callback = KernelLogger(f"{cfg.data.dataset}_{cfg.kernel.kernel_no_layers}_{cfg.net.hidden_channels}")
         callbacks.extend([model_summary_callback, checkpoint_callback, early_stop_callback])
+        if cfg.train.accelerator == "cuda":
+            callbacks.append(kernel_logger_callback)
 
     # Setup profiler
     profiler = None

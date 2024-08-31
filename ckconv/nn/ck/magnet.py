@@ -192,7 +192,7 @@ class AnisotropicGaborLayer(nn.Module):
         # Multiply all the envelopes together
         g_envelope = g_envelopes[0]
         for i in range(1, self.data_dim):
-            g_envelope *= g_envelopes[i]
+            g_envelope = g_envelope * g_envelopes[i]
 
         # Squeeze the third dimension
         g_envelope = g_envelope.squeeze(2)

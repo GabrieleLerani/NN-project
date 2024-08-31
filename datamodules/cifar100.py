@@ -14,7 +14,7 @@ class Cifar100DataModule(L.LightningDataModule):
         self.cfg = cfg
         self.num_workers = 0 # for google colab training
         self.transform = transforms.ToTensor()
-        
+        self._yaml_parameters()
 
 
     def prepare_data(self):
@@ -53,17 +53,14 @@ class Cifar100DataModule(L.LightningDataModule):
 
     def setup(self, stage: str):
         
-    
-        self._yaml_parameters()
-
         self.batch_size = self.cfg.train.batch_size
 
     
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
-            self.cifar100_full = CIFAR100(self.data_dir, train=True)
+            self.cifar100_full = CIFAR100(self.data_dir, train=True, transform=self.transform)
             self.cifar100_train, self.cifar100_val = random_split(
-                self.cifar100_full, [45000, 5000], generator=torch.Generator().manual_seed(42)
+                self.cifar100_full, [45000, 5000], generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42)
             )
             print(f'Training set size: {len(self.cifar100_train)}')
             print(f'Validation set size: {len(self.cifar100_val)}')

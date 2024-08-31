@@ -139,3 +139,9 @@ class CCNN(pl.LightningModule):
         scheduler = optim.lr_scheduler.SequentialLR(optimizer, schedulers=[linear_warmup, cosine_scheduler], milestones=[self.warmup_epochs])
 
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
+    
+    def get_kernel(self):
+        sep_flex_conv_layer = self.seq_modules[0]
+        if isinstance(sep_flex_conv_layer, SepFlexConv):
+            return sep_flex_conv_layer.masked_kernel
+        return None
