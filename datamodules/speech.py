@@ -15,7 +15,7 @@ class SpeechCommandsModule(L.LightningDataModule):
         self.download_location = self.data_dir + "/SpeechCommands/speech_commands_v0.02"
         self.type = cfg.data.dataset
         self.cfg = cfg
-        self.num_workers = 7
+        self.num_workers = 0 # for google colab training
 
 
     def process_data(self):

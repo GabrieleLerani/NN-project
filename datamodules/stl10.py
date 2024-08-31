@@ -12,7 +12,7 @@ class STL10DataModule(L.LightningDataModule):
         super().__init__()
         self.data_dir = data_dir
         self.cfg = cfg
-        self.num_workers = 7
+        self.num_workers = 0 # for google colab training
         self.transform = transforms.ToTensor()
 
 

@@ -12,7 +12,7 @@ class MnistDataModule(L.LightningDataModule):
         self.data_dir = data_dir
         self.type = cfg.data.dataset
         self.cfg = cfg
-        self.num_workers = 7
+        self.num_workers = 0 # for google colab training
 
 
     def prepare_data(self):
