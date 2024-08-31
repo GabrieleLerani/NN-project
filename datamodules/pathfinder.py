@@ -19,7 +19,7 @@ class PathfinderDataset(torch.utils.data.Dataset):
                 an image path and its corresponding label.
             transform (Optional[Callable]): Optional transformation function or composition of transformations.
         """
-        self.img_list = img_list
+        self.img_list = self.create_imagelist()
         self.transform = transform
 
     def __len__(self) -> int:
@@ -43,7 +43,7 @@ class PathfinderDataset(torch.utils.data.Dataset):
 
         return img, label
 
-    def create_imagelist(self):
+    def create_imagelist(self) -> List[Tuple[str, int]]:
         # TODO create image list from directories
         pass
 
