@@ -59,7 +59,7 @@ def setup_trainer_components(cfg: OmegaConf):
         checkpoint_callback = ModelCheckpoint(
             monitor="accuracy",
             dirpath=path,
-            save_top_k=-1,
+            save_top_k=1,
             every_n_epochs=1,
             mode="max"
         )
@@ -95,9 +95,9 @@ def create_trainer(cfg: OmegaConf, logger: TensorBoardLogger, callbacks: list, p
         callbacks=callbacks,
         profiler=profiler,
         # TODO used for testing
-        #limit_train_batches=3,
-        #limit_val_batches=3,
-        #limit_test_batches=3
+        limit_train_batches=3,
+        limit_val_batches=3,
+        limit_test_batches=3
     )
 
 def train(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:
@@ -114,7 +114,9 @@ def train(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:
 def get_checkpoint_path(cfg: OmegaConf) -> str:
     filename = f"{cfg.data.dataset}_{cfg.net.no_blocks}_{cfg.net.hidden_channels}"
     path = os.path.join("checkpoints", filename)
-    checkpoint_path = os.path.join(path, f"epoch={cfg.load_model.epoch}-step={cfg.load_model.step}.ckpt")
+    # there should be only one file
+    files = os.listdir(path)
+    checkpoint_path = os.path.join(path, files[0])
 
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"{checkpoint_path} file doesn't exist")

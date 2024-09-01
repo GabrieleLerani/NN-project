@@ -16,8 +16,7 @@ kernel:
   omega_0: 20
 
 load_model:
-  pre_trained: False
-  model_file: ""
+  pre_trained: True
   epoch: 0
   step: 0
 
