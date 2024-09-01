@@ -1,13 +1,18 @@
-import torch
-from torch.utils.data import random_split, DataLoader
-from torchvision import transforms, datasets
-import pytorch_lightning as pl
-from PIL import Image
-from pathlib import Path
-from hydra import utils
-from typing import Optional, Callable, Tuple, Dict, List, cast
-from omegaconf import OmegaConf
 import os
+import tarfile
+from pathlib import Path
+from typing import Optional, Callable, Tuple, List
+
+import torch
+from torch.utils.data import DataLoader, random_split
+from torchvision import transforms
+from PIL import Image
+import pytorch_lightning as pl
+import requests
+
+
+# There's an empty file in the dataset
+PATHFINDER_BLACKLIST = {"pathfinder32/curv_baseline/imgs/0/sample_172.png"}
 
 
 class PathfinderDataset(torch.utils.data.Dataset):
@@ -66,26 +71,40 @@ class PathfinderDataset(torch.utils.data.Dataset):
         return instances
 
 
-class PathFinderDataModule(pl.LightningDataModule):
+class PathfinderDataModule(pl.LightningDataModule):
     def __init__(
         self,
         cfg,
-        data_dir: str = "datasets",
+        data_dir,
+        batch_size: int = 32,
+        test_batch_size: int = 32,
         data_type="default",
+        resolution="32",
+        level="hard",
+        val_split=0.1,
+        test_split=0.1,
     ):
-        """
-        Resolution in [32,64,128,256]
-        Level in ["easy", "intermediate", "hard"]
-        TODO look at the dir structure
-
-        """
         super().__init__()
-        self.data_dir = data_dir
-        self.type = cfg.data.dataset
-        self.cfg = cfg
-        self.num_workers = 0  # for google colab training
 
+        level_dir = {
+            "easy": "curv_baseline",
+            "intermediate": "curv_contour_length_9",
+            "hard": "curv_contour_length_14",
+        }[level]
+
+        # Save parameters to self
+        data_dir = data_dir + f"/lra_release/pathfinder{resolution}/{level_dir}"
         self.data_dir = Path(data_dir)
+        self.batch_size = batch_size
+        self.test_batch_size = test_batch_size
+
+        self.resolution = resolution
+        self.level = level
+
+        self.val_split = val_split
+        self.test_split = test_split
+
+        self.num_workers = 0  # for google colab training
 
         # Determine data_type
         if data_type == "default":
@@ -102,12 +121,33 @@ class PathFinderDataModule(pl.LightningDataModule):
         self.output_channels = 2
 
     def prepare_data(self):
-        # download, not required
-        pass
+        if not self.data_dir.is_dir():
+            self.download_and_extract_lra_release(self.data_dir)
+
+    def download_and_extract_lra_release(self, data_dir):
+        url = "https://storage.googleapis.com/long-range-arena/lra_release.gz"
+        local_filename = os.path.join(data_dir, "lra_release.gz")
+
+        # Create data directory if it doesn't exist
+        os.makedirs(data_dir, exist_ok=True)
+
+        # Download the file
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(local_filename, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+        # Extract the tar.gz file
+        with tarfile.open(local_filename, "r:gz") as tar:
+            tar.extractall(path=data_dir)
+
+        # Optionally, remove the tar.gz file after extraction
+        os.remove(local_filename)
 
     def setup(self, stage=None):
         self._set_transform()
-        self._yaml_parameters()  # TODO set correct params
+        # self._yaml_parameters()  # TODO set correct params
 
         self.dataset = PathfinderDataset(self.data_dir, transform=self.transform)
         # compute lengths
@@ -133,45 +173,14 @@ class PathFinderDataModule(pl.LightningDataModule):
         )
 
     def _yaml_parameters(self):
-        hidden_channels = self.cfg.net.hidden_channels
+        pass
 
-        OmegaConf.update(self.cfg, "train.batch_size", 100)
-        OmegaConf.update(self.cfg, "train.epochs", 210)
-        OmegaConf.update(self.cfg, "net.in_channels", 1)
-        OmegaConf.update(self.cfg, "net.out_channels", 10)
-        OmegaConf.update(self.cfg, "net.data_dim", 1)
-
-        if hidden_channels == 140:
-            if self.type == "smnist":
-                OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
-                OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
-                OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
-                OmegaConf.update(self.cfg, "kernel.omega_0", 2976.49)
-            elif self.type == "pmnist":
-                OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
-                OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
-                OmegaConf.update(self.cfg, "train.weight_decay", 0)
-                OmegaConf.update(self.cfg, "kernel.omega_0", 2985.63)
-        elif hidden_channels == 380:
-            OmegaConf.update(self.cfg, "train.weight_decay", 0)
-
-            if self.type == "smnist":
-                OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
-                OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
-                OmegaConf.update(self.cfg, "kernel.omega_0", 2976.49)
-            elif self.type == "pmnist":
-                OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
-                OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
-                OmegaConf.update(self.cfg, "kernel.omega_0", 2985.63)
-
-    # we define a separate DataLoader for each of train/val/test
     def train_dataloader(self):
         train_dataloader = DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
-            pin_memory=self.pin_memory,
             drop_last=True,
         )
         return train_dataloader
@@ -182,7 +191,6 @@ class PathFinderDataModule(pl.LightningDataModule):
             batch_size=self.test_batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            pin_memory=self.pin_memory,
         )
         return val_dataloader
 
@@ -192,35 +200,46 @@ class PathFinderDataModule(pl.LightningDataModule):
             batch_size=self.test_batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            pin_memory=self.pin_memory,
         )
         return test_dataloader
 
     def on_before_batch_transfer(self, batch, dataloader_idx):
         if self.data_type == "sequence":
-            # If sequential, flatten the input [B, C, Y, X] -> [B, C, -1]
             x, y = batch
             x_shape = x.shape
-            # Flatten
             x = x.view(x_shape[0], x_shape[1], -1)
             batch = x, y
         return batch
 
 
 if __name__ == "__main__":
-    # TODO create this list in the dataset init in tghis format
-    img_list = [
-        # ("path/to/image1.jpg", 0),
-        # ("path/to/image2.jpg", 1),
-        # Add more image paths and labels
-    ]
+    import matplotlib.pyplot as plt
 
-    # Define any transformations you want to apply
-    transform = transforms.Compose(
-        [
-            transforms.Resize((128, 128)),
-            transforms.ToTensor(),
-        ]
-    )
+    # prompt: Generate the code to instantiate PathFinderDataModule
+    dm = PathfinderDataModule(data_dir="./", batch_size=32, test_batch_size=32)
+    dm.prepare_data()
+    dm.setup()
+    # Fetch a sample from the training dataset
+    sample_idx = 0  # Index of the sample you want to print
+    sample = dm.train_dataset[sample_idx]
 
-    dataset = PathfinderDataset(img_list=img_list, transform=transform)
+    # If the sample is a tuple (image, label)
+    if isinstance(sample, tuple):
+        image, label = sample
+    else:
+        image = sample
+        label = None
+
+    # Print label
+    if label is not None:
+        print(f"Label: {label}")
+
+    # Print image
+    # Assuming image is a PIL image or a tensor that can be converted to PIL
+    if isinstance(image, torch.Tensor):
+        image = transforms.ToPILImage()(image)
+
+    plt.imshow(image)
+    plt.title(f"Sample {sample_idx}")
+    plt.axis("off")  # Hide axis
+    plt.show()

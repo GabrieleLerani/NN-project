@@ -1,82 +1,99 @@
-import torch
-from torch.utils.data import random_split, DataLoader
-import torchtext.nn
-from torchvision import transforms, datasets
-import pytorch_lightning as pl
-from PIL import Image
 from pathlib import Path
-from hydra import utils
-from typing import Optional, Callable, Tuple, Dict, List, cast
-from omegaconf import OmegaConf
-from datasets import load_dataset, DatasetDict
-import torchtext
+
+import torch
+from torch.utils.data import DataLoader
+from torchvision import transforms
+import pytorch_lightning as pl
+
+
+from datasets import load_dataset
+from transformers import AutoTokenizer
 
 
 class IMDBDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        cfg,
-        data_dir: str = "datasets",
-        data_type="sequence",  # no other types allowed
+        data_dir,
+        batch_size,
+        test_batch_size,
+        data_type,
+        max_length=4096,
+        tokenizer_type="word",
+        tokenizer_name="bert-base-uncased",
+        vocab_min_freq=15,
+        append_bos=False,
+        append_eos=True,
+        val_split=0.0,
     ):
-        """
-        Resolution in [32,64,128,256]
-        Level in ["easy", "intermediate", "hard"]
-        TODO look at the dir structure
+        assert tokenizer_type in [
+            "word",
+            "char",
+        ], f"tokenizer_type {tokenizer_type} not supported"
 
-        """
         super().__init__()
-        self.data_dir = data_dir
-        self.type = cfg.data.dataset
-        # TODO set via conf or parameter init the parameters required
-        self.cfg = cfg
-        self.num_workers = 0  # for google colab training
 
-        self.data_dir = Path(data_dir)
+        # Save parameters to self
+        self.data_dir = Path(data_dir) / "IMDB"
+        self.batch_size = batch_size
+        self.test_batch_size = test_batch_size
+        self.num_workers = 7
 
+        self.max_length = max_length
+        self.tokenizer_type = tokenizer_type
+        self.vocab_min_freq = vocab_min_freq
+        self.append_bos = append_bos
+        self.append_eos = append_eos
+        self.val_split = val_split
+        self.tokenizer_name = tokenizer_name
+
+        # Determine data_type
         if data_type == "default":
-            self.data_type = "image"
-            self.data_dim = 2
-        elif data_type == "sequence":
-            self.data_type = data_type
+            self.data_type = "sequence"
             self.data_dim = 1
         else:
             raise ValueError(f"data_type {data_type} not supported.")
 
+        # Determine sizes of dataset
         self.input_channels = 1
         self.output_channels = 2
 
     def prepare_data(self):
-        self.dataset = load_dataset("imdb", cache_dir=self.data_dir)
-        self.dataset = DatasetDict(
-            train=self.dataset["train"], test=self.dataset["test"]
+
+        dataset = load_dataset("imdb", cache_dir=self.data_dir)
+
+        # Initialize tokenizer
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.tokenizer_name, use_fast=True
+        )
+        self.tokenizer.add_special_tokens(
+            {"additional_special_tokens": ["<bos>", "<eos>"]}
         )
 
-        tokenizer = torchtext.data.utils.get_tokenizer("basic_english")
+        def tokenize_function(example):
+            encoding = self.tokenizer(
+                example["text"],
+                truncation=True,
+                padding="max_length",
+                max_length=self.max_length,
+                return_tensors="pt",
+            )
+            return {
+                "input_ids": encoding["input_ids"]
+                .squeeze()
+                .tolist()  # Convert tensor to list
+            }
 
-        def tokenize(example):
-            return {"tokens": tokenizer(example["text"])[: self.max_length]}
-
-        self.dataset = self.dataset.map(
-            tokenize,
+        # Tokenize and map to dataset
+        tokenized_datasets = dataset.map(
+            tokenize_function,
+            batched=True,
             remove_columns=["text"],
+            keep_in_memory=True,
+            load_from_cache_file=False,
             num_proc=self.num_workers,
         )
 
-        self.vocab = torchtext.vocab.build_vocab_from_iterator(
-            self.dataset["train"]["tokens"], min_freq=1, specials=["<pad>", "<unk>"]
-        )
-        self.vocab.set_default_index(self.vocab["<unk>"])
-
-        def numericalize(example):
-            input_ids = self.vocab(example["tokens"])
-            return {"input_ids": input_ids}
-
-        self.dataset = self.dataset.map(
-            numericalize,
-            remove_columns=["tokens"],
-            num_proc=self.num_workers,
-        )
+        self.dataset = tokenized_datasets
 
     def setup(self, stage=None):
 
@@ -131,36 +148,7 @@ class IMDBDataModule(pl.LightningDataModule):
         )
 
     def _yaml_parameters(self):
-        hidden_channels = self.cfg.net.hidden_channels
-
-        OmegaConf.update(self.cfg, "train.batch_size", 100)
-        OmegaConf.update(self.cfg, "train.epochs", 210)
-        OmegaConf.update(self.cfg, "net.in_channels", 1)
-        OmegaConf.update(self.cfg, "net.out_channels", 10)
-        OmegaConf.update(self.cfg, "net.data_dim", 1)
-
-        if hidden_channels == 140:
-            if self.type == "smnist":
-                OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
-                OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
-                OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
-                OmegaConf.update(self.cfg, "kernel.omega_0", 2976.49)
-            elif self.type == "pmnist":
-                OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
-                OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
-                OmegaConf.update(self.cfg, "train.weight_decay", 0)
-                OmegaConf.update(self.cfg, "kernel.omega_0", 2985.63)
-        elif hidden_channels == 380:
-            OmegaConf.update(self.cfg, "train.weight_decay", 0)
-
-            if self.type == "smnist":
-                OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
-                OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
-                OmegaConf.update(self.cfg, "kernel.omega_0", 2976.49)
-            elif self.type == "pmnist":
-                OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
-                OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
-                OmegaConf.update(self.cfg, "kernel.omega_0", 2985.63)
+        pass
 
     def train_dataloader(self):
         train_dataloader = DataLoader(
@@ -168,7 +156,6 @@ class IMDBDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
-            pin_memory=self.pin_memory,
             drop_last=True,
             collate_fn=self.collate_fn,
         )
@@ -180,7 +167,6 @@ class IMDBDataModule(pl.LightningDataModule):
             batch_size=self.test_batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            pin_memory=self.pin_memory,
             collate_fn=self.collate_fn,
         )
         return val_dataloader
@@ -191,11 +177,29 @@ class IMDBDataModule(pl.LightningDataModule):
             batch_size=self.test_batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            pin_memory=self.pin_memory,
             collate_fn=self.collate_fn,
         )
         return test_dataloader
 
 
 if __name__ == "__main__":
-    pass
+
+    dm = IMDBDataModule(
+        data_dir="./", batch_size=32, test_batch_size=32, data_type="default"
+    )
+    dm.prepare_data()
+    dm.setup()
+    # Retrieve and print a sample
+    train_loader = dm.train_dataloader()
+
+    # Get a batch of data
+    for images, labels in train_loader:
+        print(f"Batch of images shape: {images.shape}")
+        print(f"Batch of labels: {labels}")
+
+        # Print the first image and label in the batch
+        print(f"First image tensor: {images[0]}")
+        print(f"First label: {labels[0]}")
+
+        # Break after first batch for demonstration
+        break

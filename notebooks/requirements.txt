@@ -10,7 +10,6 @@ torch-geometric
 hydra-core
 wandb
 datasets
-transformers
 pytorch-lightning
 torchmetrics
 tensorboard
