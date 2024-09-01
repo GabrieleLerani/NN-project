@@ -1,12 +1,13 @@
 from pathlib import Path
 
+import os
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import pytorch_lightning as pl
 
+from datasets import load_dataset, DatasetDict
 
-from datasets import load_dataset
 from transformers import AutoTokenizer
 
 
@@ -58,49 +59,59 @@ class IMDBDataModule(pl.LightningDataModule):
         self.output_channels = 2
 
     def prepare_data(self):
-
-        dataset = load_dataset("imdb", cache_dir=self.data_dir)
-
-        # Initialize tokenizer
+        serialized_dataset_path = os.path.join(self.data_dir, "tokenized_dataset")
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.tokenizer_name, use_fast=True
         )
-        self.tokenizer.add_special_tokens(
-            {"additional_special_tokens": ["<bos>", "<eos>"]}
-        )
 
-        def tokenize_function(example):
-            encoding = self.tokenizer(
-                example["text"],
-                truncation=True,
-                padding="max_length",
-                max_length=self.max_length,
-                return_tensors="pt",
+        if os.path.exists(serialized_dataset_path):
+            print(f"Loading dataset from {serialized_dataset_path}...")
+            self.dataset = DatasetDict.load_from_disk(serialized_dataset_path)
+        else:
+            dataset = load_dataset("imdb", cache_dir=self.data_dir)
+
+            # Initialize tokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.tokenizer_name, use_fast=True
             )
-            return {
-                "input_ids": encoding["input_ids"]
-                .squeeze()
-                .tolist()  # Convert tensor to list
-            }
+            self.tokenizer.add_special_tokens(
+                {"additional_special_tokens": ["<bos>", "<eos>"]}
+            )
 
-        # Tokenize and map to dataset
-        tokenized_datasets = dataset.map(
-            tokenize_function,
-            batched=True,
-            remove_columns=["text"],
-            keep_in_memory=True,
-            load_from_cache_file=False,
-            num_proc=self.num_workers,
-        )
+            def tokenize_function(example):
+                encoding = self.tokenizer(
+                    example["text"],
+                    truncation=True,
+                    padding="max_length",
+                    max_length=self.max_length,
+                    return_tensors="pt",
+                )
+                return {
+                    "input_ids": encoding["input_ids"]
+                    .squeeze()
+                    .tolist()  # Convert tensor to list
+                }
 
-        self.dataset = tokenized_datasets
+            # Tokenize and map to dataset
+            tokenized_datasets = dataset.map(
+                tokenize_function,
+                batched=True,
+                remove_columns=["text"],
+                keep_in_memory=True,
+                load_from_cache_file=False,
+                num_proc=self.num_workers,
+            )
+
+            self.dataset = tokenized_datasets
+
+            print(f"Saving dataset to {serialized_dataset_path}...")
+            self.dataset.save_to_disk(serialized_dataset_path)
 
     def setup(self, stage=None):
 
         self._set_transform()
         self._yaml_parameters()
 
-        self.vocab_size = len(self.vocab)
         self.dataset.set_format(type="torch", columns=["input_ids", "label"])
 
         self.train_dataset, self.test_dataset = (
@@ -108,14 +119,17 @@ class IMDBDataModule(pl.LightningDataModule):
             self.dataset["test"],
         )
 
+        # Use tokenizer padding token ID
+        self.pad_token_id = self.tokenizer.pad_token_id
+
         def collate_batch(batch):
             input_ids = [data["input_ids"] for data in batch]
             labels = [data["label"] for data in batch]
 
-            pad_value = float(self.vocab["<pad>"])
-
             padded_input_ids = torch.nn.utils.rnn.pad_sequence(
-                input_ids, batch_first=True, padding_value=pad_value
+                [torch.tensor(ids) for ids in input_ids],
+                batch_first=True,
+                padding_value=self.pad_token_id,
             )
 
             if padded_input_ids.size(1) > self.max_length:
@@ -128,11 +142,10 @@ class IMDBDataModule(pl.LightningDataModule):
                 padded_input_ids = torch.nn.functional.pad(
                     padded_input_ids,
                     (padding_size, 0),  # pad on the left
-                    value=pad_value,
+                    value=self.pad_token_id,
                 )
 
             input_tensor = padded_input_ids.unsqueeze(1).float()
-
             label_tensor = torch.tensor(labels)
 
             return input_tensor, label_tensor
@@ -180,6 +193,10 @@ class IMDBDataModule(pl.LightningDataModule):
             collate_fn=self.collate_fn,
         )
         return test_dataloader
+
+
+if __name__ == "__main__":
+    pass
 
 
 if __name__ == "__main__":

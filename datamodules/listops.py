@@ -1,31 +1,15 @@
-from pathlib import Path
-
-import torch
-from torch.utils.data import DataLoader
-from torchvision import transforms
-import pytorch_lightning as pl
-import tarfile
-
-
-from datasets import load_dataset
-from transformers import AutoTokenizer
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
-import torch
-from pathlib import Path
-from transformers import AutoTokenizer
-
-
-import pytorch_lightning as pl
-from torch.utils.data import DataLoader
-import pandas as pd
-import torch
-from pathlib import Path
-from transformers import AutoTokenizer
-import numpy as np
-from datasets import load_dataset
 import os
 import requests
+import tarfile
+import torch
+from pathlib import Path
+from transformers import AutoTokenizer
+from datasets import load_dataset
+
+
+from torchvision import transforms
 
 
 class ListOpsDataModule(pl.LightningDataModule):
@@ -41,10 +25,7 @@ class ListOpsDataModule(pl.LightningDataModule):
         tokenizer_name="bert-base-uncased",
     ):
         super().__init__()
-        self.data_dir = (
-            Path(data_dir)
-            / "lra_release/pathfinder32/curv_contour_length_14/lra_release/listops-1000"
-        )
+        self.data_dir = Path(data_dir) / "datasets"
         self.batch_size = batch_size
         self.test_batch_size = test_batch_size
         self.num_workers = 7
@@ -68,74 +49,99 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.output_channels = 10
 
     def prepare_data(self):
+
         if not self.data_dir.is_dir():
             self.download_and_extract_lra_release(self.data_dir)
-
-        dataset = load_dataset(
-            "csv",
-            data_files={
-                "train": str(self.data_dir / "basic_train.tsv"),
-                "val": str(self.data_dir / "basic_val.tsv"),
-                "test": str(self.data_dir / "basic_test.tsv"),
-            },
-            delimiter="\t",
-            keep_in_memory=True,
-        )
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.tokenizer_name, use_fast=True
         )
 
-        # Adjust tokenizer for BOS and EOS tokens if needed
-        if self.append_bos:
-            self.tokenizer.add_special_tokens({"additional_special_tokens": ["<bos>"]})
-        if self.append_eos:
-            self.tokenizer.add_special_tokens({"additional_special_tokens": ["<eos>"]})
+        serialized_dataset_path = os.path.join(self.data_dir, "tokenized_dataset")
 
-        tokenize = lambda example: {
-            "tokens": self.tokenizer(
-                example["Source"],
-                truncation=True,
-                padding="max_length",
-                max_length=self.max_length,
-                return_tensors="pt",
-            )["input_ids"]
-            .squeeze()
-            .tolist()  # Convert tensor to list
-        }
-        dataset = dataset.map(
-            tokenize,
-            remove_columns=["Source"],
-            keep_in_memory=True,
-            load_from_cache_file=False,
-            num_proc=self.num_workers,
-        )
+        if os.path.exists(serialized_dataset_path):
+            print(f"Loading dataset from {serialized_dataset_path}...")
+            self.dataset = DatasetDict.load_from_disk(serialized_dataset_path)
+        else:
 
-        def numericalize(example):
-            tokens = (
-                (
-                    self.tokenizer.convert_tokens_to_ids(["<bos>"])
-                    if self.append_bos
-                    else []
-                )
-                + example["tokens"]
-                + (
-                    self.tokenizer.convert_tokens_to_ids(["<eos>"])
-                    if self.append_eos
-                    else []
-                )
+            dataset = load_dataset(
+                "csv",
+                data_files={
+                    "train": str(
+                        self.data_dir / "lra_release/listops-1000/basic_train.tsv"
+                    ),
+                    "val": str(
+                        self.data_dir / "lra_release/listops-1000/basic_val.tsv"
+                    ),
+                    "test": str(
+                        self.data_dir / "lra_release/listops-1000/basic_test.tsv"
+                    ),
+                },
+                delimiter="\t",
+                keep_in_memory=True,
             )
-            return {"input_ids": tokens}
 
-        dataset = dataset.map(
-            numericalize,
-            remove_columns=["tokens"],
-            keep_in_memory=True,
-            load_from_cache_file=False,
-            num_proc=self.num_workers,
-        )
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.tokenizer_name, use_fast=True
+            )
 
-        self.dataset = dataset
+            # Adjust tokenizer for BOS and EOS tokens if needed
+            if self.append_bos:
+                self.tokenizer.add_special_tokens(
+                    {"additional_special_tokens": ["<bos>"]}
+                )
+            if self.append_eos:
+                self.tokenizer.add_special_tokens(
+                    {"additional_special_tokens": ["<eos>"]}
+                )
+
+            tokenize = lambda example: {
+                "tokens": self.tokenizer(
+                    example["Source"],
+                    truncation=True,
+                    padding="max_length",
+                    max_length=self.max_length,
+                    return_tensors="pt",
+                )["input_ids"]
+                .squeeze()
+                .tolist()  # Convert tensor to list
+            }
+            dataset = dataset.map(
+                tokenize,
+                remove_columns=["Source"],
+                keep_in_memory=True,
+                load_from_cache_file=False,
+                num_proc=self.num_workers,
+            )
+
+            def numericalize(example):
+                tokens = (
+                    (
+                        self.tokenizer.convert_tokens_to_ids(["<bos>"])
+                        if self.append_bos
+                        else []
+                    )
+                    + example["tokens"]
+                    + (
+                        self.tokenizer.convert_tokens_to_ids(["<eos>"])
+                        if self.append_eos
+                        else []
+                    )
+                )
+                return {"input_ids": tokens}
+
+            dataset = dataset.map(
+                numericalize,
+                remove_columns=["tokens"],
+                keep_in_memory=True,
+                load_from_cache_file=False,
+                num_proc=self.num_workers,
+            )
+
+            self.dataset = dataset
+
+            print(f"Saving dataset to {serialized_dataset_path}...")
+            self.dataset.save_to_disk(serialized_dataset_path)
 
     def download_and_extract_lra_release(self, data_dir):
 
@@ -168,7 +174,6 @@ class ListOpsDataModule(pl.LightningDataModule):
         self._set_transform()
         self._yaml_parameters()  # TODO set correct params
 
-        self.vocab_size = len(self.vocab)
         self.dataset.set_format(type="torch", columns=["input_ids", "Target"])
 
         self.train_dataset, self.val_dataset, self.test_dataset = (
@@ -177,27 +182,32 @@ class ListOpsDataModule(pl.LightningDataModule):
             self.dataset["test"],
         )
 
-        def collate_batch(batch):
+        def collate_batch(self, batch):
             input_ids = [data["input_ids"] for data in batch]
-            labels = [data["Target"] for data in batch]
+            labels = [
+                data["Target"] for data in batch
+            ]  # Ensure this matches your dataset column name
 
-            pad_value = self.vocab.pad_index
+            # Retrieve the padding token ID from the tokenizer
+            pad_value = self.tokenizer.pad_token_id
 
+            # Convert lists of input IDs to tensors and pad them
             padded_input_ids = torch.nn.utils.rnn.pad_sequence(
                 [torch.tensor(seq) for seq in input_ids],
                 batch_first=True,
                 padding_value=pad_value,
             )
 
+            # Truncate or pad to max_length
             if padded_input_ids.size(1) > self.max_length:
                 padded_input_ids = padded_input_ids[
                     :, -self.max_length :
-                ]  # truncate to max_length
+                ]  # Truncate to max_length
             else:
                 padding_size = self.max_length - padded_input_ids.size(1)
                 padded_input_ids = torch.nn.functional.pad(
                     padded_input_ids,
-                    (padding_size, 0),  # pad on the left
+                    (0, padding_size),  # Pad on the right
                     value=pad_value,
                 )
 
@@ -206,6 +216,7 @@ class ListOpsDataModule(pl.LightningDataModule):
 
             return input_tensor, label_tensor
 
+        # Set the collate function
         self.collate_fn = collate_batch
 
     def _set_transform(self):
@@ -241,6 +252,10 @@ class ListOpsDataModule(pl.LightningDataModule):
             pin_memory=self.pin_memory,
             collate_fn=self.collate_fn,
         )
+
+
+if __name__ == "__main__":
+    pass
 
 
 if __name__ == "__main__":
