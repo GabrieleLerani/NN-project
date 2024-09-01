@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import pytorch_lightning as pl
+import tarfile
 
 
 from datasets import load_dataset
@@ -137,6 +138,12 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.dataset = dataset
 
     def download_and_extract_lra_release(self, data_dir):
+
+        if os.path.exists(Path(data_dir) / "lra_release"):
+            print(
+                f"Directory {data_dir} already exists. Skipping download and extraction."
+            )
+            return
         url = "https://storage.googleapis.com/long-range-arena/lra_release.gz"
         local_filename = os.path.join(data_dir, "lra_release.gz")
 
@@ -238,7 +245,10 @@ class ListOpsDataModule(pl.LightningDataModule):
 
 if __name__ == "__main__":
     dm = ListOpsDataModule(
-        data_dir="./", batch_size=32, test_batch_size=32, data_type="default"
+        data_dir="./data/dataset",
+        batch_size=32,
+        test_batch_size=32,
+        data_type="default",
     )
     dm.prepare_data()
     dm.setup()

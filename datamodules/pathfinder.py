@@ -9,6 +9,7 @@ from torchvision import transforms
 from PIL import Image
 import pytorch_lightning as pl
 import requests
+import matplotlib.pyplot as plt
 
 
 # There's an empty file in the dataset
@@ -74,7 +75,6 @@ class PathfinderDataset(torch.utils.data.Dataset):
 class PathfinderDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        cfg,
         data_dir,
         batch_size: int = 32,
         test_batch_size: int = 32,
@@ -125,6 +125,11 @@ class PathfinderDataModule(pl.LightningDataModule):
             self.download_and_extract_lra_release(self.data_dir)
 
     def download_and_extract_lra_release(self, data_dir):
+        if os.path.exists(Path(data_dir) / "lra_release"):
+            print(
+                f"Directory {data_dir} already exists. Skipping download and extraction."
+            )
+            return
         url = "https://storage.googleapis.com/long-range-arena/lra_release.gz"
         local_filename = os.path.join(data_dir, "lra_release.gz")
 
@@ -213,10 +218,12 @@ class PathfinderDataModule(pl.LightningDataModule):
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
 
+    # torch.set_default_device("mps")
     # prompt: Generate the code to instantiate PathFinderDataModule
-    dm = PathfinderDataModule(data_dir="./", batch_size=32, test_batch_size=32)
+    dm = PathfinderDataModule(
+        data_dir="./data/datasets", batch_size=32, test_batch_size=32
+    )
     dm.prepare_data()
     dm.setup()
     # Fetch a sample from the training dataset
