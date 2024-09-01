@@ -1,11 +1,11 @@
 import pytorch_lightning as L
 from torchvision.datasets import MNIST
-from torch.utils.data import random_split, DataLoader
+from torch.utils.data import random_split, DataLoader, Dataset
 from torchvision import transforms
 import torch
 import matplotlib.pyplot as plt
 from omegaconf import OmegaConf
-
+from typing import Tuple
 
 class MnistDataModule(L.LightningDataModule):
     def __init__(self, cfg, data_dir: str = "datasets"):
@@ -33,9 +33,8 @@ class MnistDataModule(L.LightningDataModule):
 
         if self.type == "pmnist":
             self.transform.transforms.append(
-                transforms.Lambda(lambda x: x[torch.randperm(self.size)])
-            )  # permutation of the 784 pixels
-
+                transforms.Lambda(lambda x: x[: ,torch.randperm(784)])
+            )  # permutation of the 784 pixels of the width dimension
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
 
@@ -75,15 +74,9 @@ class MnistDataModule(L.LightningDataModule):
 
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
-            self.mnist_full = MNIST(self.data_dir, train=True, transform=self.transform)
-            self.mnist_train, self.mnist_val = random_split(
-                self.mnist_full,
-                [55000, 5000],
-                generator=torch.Generator("cpu").manual_seed(42),
-            )
-            print(f"Training set size: {len(self.mnist_train)}")
-            print(f"Validation set size: {len(self.mnist_val)}")
 
+            self.mnist_train, self.mnist_val = self._get_train_dataset()
+            
         # Assign test dataset for use in dataloader(s)
         if stage == "test":
             self.mnist_test = MNIST(
@@ -96,6 +89,41 @@ class MnistDataModule(L.LightningDataModule):
                 self.data_dir, train=False, transform=self.transform
             )
             print(f"Prediction set size: {len(self.mnist_predict)}")
+
+    def _get_train_dataset(self) -> Tuple[Dataset, Dataset]:
+        FULL_TRAIN_SIZE = 55000
+        FULL_VAL_SIZE = 5000
+        self.mnist_full = MNIST(self.data_dir, train=True, transform=self.transform)
+
+        # Split the full dataset into train and validation sets
+        mnist_train_full, mnist_val_full = random_split(
+            self.mnist_full,
+            [FULL_TRAIN_SIZE, FULL_VAL_SIZE],
+            generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+        )
+
+        if self.cfg.data.reduced_dataset:
+            REDUCED_TRAIN_SIZE = 1000
+            REDUCED_VAL_SIZE = 200
+
+            mnist_train, _ = random_split(
+                mnist_train_full,
+                [REDUCED_TRAIN_SIZE, FULL_TRAIN_SIZE - REDUCED_TRAIN_SIZE],
+                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+            )
+            mnist_val, _ = random_split(
+                mnist_val_full,
+                [REDUCED_VAL_SIZE, FULL_VAL_SIZE - REDUCED_VAL_SIZE],
+                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+            )
+        else:
+            mnist_train, mnist_val = mnist_train_full, mnist_val_full
+
+        print(f"Training set size: {len(mnist_train)}")
+        print(f"Validation set size: {len(mnist_val)}")
+        return mnist_train, mnist_val
+        
+        
 
     def train_dataloader(self):
         return DataLoader(

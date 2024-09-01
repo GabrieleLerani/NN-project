@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from ckconv.nn.ck import MAGNet, create_coordinates, LinearLayer
-from ckconv.nn.conv import fftconv, conv as simple_conv
+from ckconv.nn.conv import fftconv, conv
 
 from omegaconf import OmegaConf
 
@@ -222,7 +222,7 @@ class SepFlexConv(nn.Module):
         if self.conv_type == "fftconv" and torch.all(size > self.fft_thresold):
             out = fftconv(x=x, kernel=self.masked_kernel, bias=self.bias)
         else:
-            out = simple_conv(x=x, kernel=self.masked_kernel, bias=self.bias)
+            out = conv(x=x, kernel=self.masked_kernel, bias=self.bias)
 
         # pointwise convolution where out is the spatial convolution
         out = self.pointwise_conv(out)

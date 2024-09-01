@@ -43,7 +43,7 @@ test:
 data:
   data_dir : "datasets"
   dataset : "cifar10"
-
+  reduced_dataset: False
 
 # Comment the two sections below to make hydra generate the files again
 defaults:  

@@ -8,11 +8,14 @@ from datamodules import get_data_module
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
 from pytorch_lightning.profilers import PyTorchProfiler
-
+import os
 
 # In order for Hydra to generate again the files, go to config/config.yaml and look for defaults: and hydra:
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: OmegaConf) -> None:
+    # 0. set device
+    torch.set_default_device(cfg.train.accelerator)
+
     # 1. Create the dataset
     datamodule = get_data_module(cfg)
     # 2. Create the model
@@ -43,14 +46,20 @@ def setup_trainer_components(cfg: OmegaConf):
     filename = f"{cfg.data.dataset}_{cfg.net.no_blocks}_{cfg.net.hidden_channels}"
     if cfg.train.logger:
         logger = TensorBoardLogger("tb_logs", name=filename)
-
+    
     # Setup callbacks
     callbacks = []
     if cfg.train.callbacks:
+        # create checkpoints folder
+        os.makedirs(f"checkpoints", exist_ok=True)
+        path = os.path.join("checkpoints", filename)
+        os.makedirs(path, exist_ok=True)
+
         checkpoint_callback = ModelCheckpoint(
             monitor="accuracy",
-            dirpath="checkpoints",
-            save_top_k=1,
+            dirpath=path,
+            save_top_k=-1,
+            every_n_epochs=1,
             mode="max"
         )
         early_stop_callback = EarlyStopping(

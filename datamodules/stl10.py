@@ -1,13 +1,14 @@
-import pytorch_lightning as L
+import pytorch_lightning as pl
 from torchvision.datasets import STL10
-from torch.utils.data import random_split, DataLoader
+from torch.utils.data import random_split, DataLoader, Dataset
 import torch
 from torchvision import transforms
 from omegaconf import OmegaConf
 import matplotlib.pyplot as plt
+from typing import Tuple
 
 
-class STL10DataModule(L.LightningDataModule):
+class STL10DataModule(pl.LightningDataModule):
     def __init__(self, cfg, data_dir : str = "datasets"):
         super().__init__()
         self.data_dir = data_dir
@@ -51,12 +52,8 @@ class STL10DataModule(L.LightningDataModule):
 
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
-            stl10_full = STL10(self.data_dir, split="train", transform=self.transform)
-            self.stl10_train, self.stl10_val = random_split(
-                stl10_full, [4500, 500], generatorgenerator=torch.Generator(self.cfg.train.accelerator).manual_seed(42)
-            )
-            print(f'Training set size: {len(self.stl10_train)}')
-            print(f'Validation set size: {len(self.stl10_val)}')
+            self.stl10_train, self.stl10_val = self._get_train_dataset()
+
 
         # Assign test dataset for use in dataloader(s)
         if stage == "test":
@@ -66,6 +63,41 @@ class STL10DataModule(L.LightningDataModule):
         if stage == "predict":
             self.stl10_predict = STL10(self.data_dir, split="test", transform=self.transform)
             print(f'Prediction set size: {len(self.stl10_predict)}')
+
+    def _get_train_dataset(self) -> Tuple[Dataset, Dataset]:
+
+        FULL_TRAIN_SIZE = 4500
+        FULL_VAL_SIZE = 500
+        
+        self.stl10_full = STL10(self.data_dir, train=True, transform=self.transform)
+
+        # Split the full dataset into train and validation sets
+        train_full, val_full = random_split(
+            self.stl10_full,
+            [FULL_TRAIN_SIZE, FULL_VAL_SIZE],
+            generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+        )
+
+        if self.cfg.data.reduced_dataset:
+            REDUCED_TRAIN_SIZE = 500
+            REDUCED_VAL_SIZE = 100
+            train, _ = random_split(
+                train_full,
+                [REDUCED_TRAIN_SIZE, FULL_TRAIN_SIZE - REDUCED_TRAIN_SIZE],
+                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+            )
+            val, _ = random_split(
+                val_full,
+                [REDUCED_VAL_SIZE, FULL_VAL_SIZE - REDUCED_VAL_SIZE],
+                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+            )
+        else:
+            train, val = train_full, val_full
+
+        print(f"Training set size: {len(train)}")
+        print(f"Validation set size: {len(val)}")
+        return train, val
+        
 
     def train_dataloader(self):
         return DataLoader(self.stl10_train,

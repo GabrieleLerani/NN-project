@@ -1,12 +1,14 @@
-import pytorch_lightning as L
+import pytorch_lightning as pl
 from torchvision.datasets import CIFAR100
-from torch.utils.data import random_split, DataLoader
+from torch.utils.data import random_split, DataLoader, Dataset
 import torch
 from torchvision import transforms
 import matplotlib.pyplot as plt
 from omegaconf import OmegaConf
+from typing import Tuple
 
-class Cifar100DataModule(L.LightningDataModule):
+
+class Cifar100DataModule(pl.LightningDataModule):
     def __init__(self, cfg, data_dir : str = "datasets"):
         super().__init__()
         self.data_dir = data_dir
@@ -58,12 +60,8 @@ class Cifar100DataModule(L.LightningDataModule):
     
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
-            self.cifar100_full = CIFAR100(self.data_dir, train=True, transform=self.transform)
-            self.cifar100_train, self.cifar100_val = random_split(
-                self.cifar100_full, [45000, 5000], generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42)
-            )
-            print(f'Training set size: {len(self.cifar100_train)}')
-            print(f'Validation set size: {len(self.cifar100_val)}')
+            
+            self.cifar100_train, self.cifar100_val = self._get_train_dataset()
 
         # Assign test dataset for use in dataloader(s)
         if stage == "test":
@@ -73,6 +71,40 @@ class Cifar100DataModule(L.LightningDataModule):
         if stage == "predict":
             self.cifar100_predict = CIFAR100(self.data_dir, train=False)
             print(f'Prediction set size: {len(self.cifar100_predict)}')
+
+
+    def _get_train_dataset(self) -> Tuple[Dataset, Dataset]:
+        FULL_TRAIN_SIZE = 45000
+        FULL_VAL_SIZE = 5000
+        self.cifar100_full = CIFAR100(self.data_dir, train=True, transform=self.transform)
+
+        # Split the full dataset into train and validation sets
+        train_full, val_full = random_split(
+            self.cifar100_full,
+            [FULL_TRAIN_SIZE, FULL_VAL_SIZE],
+            generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+        )
+
+        if self.cfg.data.reduced_dataset:
+            REDUCED_TRAIN_SIZE = 500
+            REDUCED_VAL_SIZE = 100
+
+            train, _ = random_split(
+                train_full,
+                [REDUCED_TRAIN_SIZE, FULL_TRAIN_SIZE - REDUCED_TRAIN_SIZE],
+                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+            )
+            val, _ = random_split(
+                val_full,
+                [REDUCED_VAL_SIZE, FULL_VAL_SIZE - REDUCED_VAL_SIZE],
+                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+            )
+        else:
+            train, val = train_full, val_full
+
+        print(f"Training set size: {len(train)}")
+        print(f"Validation set size: {len(val)}")
+        return train, val
 
     def train_dataloader(self):
         return DataLoader(
