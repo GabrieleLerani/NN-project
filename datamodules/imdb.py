@@ -185,7 +185,10 @@ class IMDBDataModule(pl.LightningDataModule):
 if __name__ == "__main__":
 
     dm = IMDBDataModule(
-        data_dir="./", batch_size=32, test_batch_size=32, data_type="default"
+        data_dir="./data/datasets",
+        batch_size=32,
+        test_batch_size=32,
+        data_type="default",
     )
     dm.prepare_data()
     dm.setup()
