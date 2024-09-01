@@ -93,14 +93,13 @@ class ListOpsDataModule(pl.LightningDataModule):
         self._set_transform()
         self._yaml_parameters()  # TODO set correct params
 
-        dataset, self.tokenizer, self.vocab = self.process_dataset()
         self.vocab_size = len(self.vocab)
-        dataset.set_format(type="torch", columns=["input_ids", "Target"])
+        self.dataset.set_format(type="torch", columns=["input_ids", "Target"])
 
         self.train_dataset, self.val_dataset, self.test_dataset = (
-            dataset["train"],
-            dataset["val"],
-            dataset["test"],
+            self.dataset["train"],
+            self.dataset["val"],
+            self.dataset["test"],
         )
 
         def collate_batch(batch):
