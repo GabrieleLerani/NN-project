@@ -5,25 +5,34 @@ import os
 
 def get_data_module(cfg : OmegaConf):
     
-    assert cfg.data.dataset in ["smnist","pmnist","cifar10","scifar10","cifar100","stl10","sc_mfcc","sc_raw","pathfinder","path_x","image"], "Dataset not supported"
+    assert cfg.data.dataset in ["smnist","pmnist","cifar10","scifar10","cifar100","stl10","sc_mfcc","sc_raw","pathfinder","listops","image"], "Dataset not supported"
     assert not (cfg.data.dataset in ["sc_mfcc","sc_raw","pathfinder","path_x","image"] and cfg.data.reduced_dataset), f"Reduced dataset not supported for {cfg.data.dataset}"
 
     # can be either sequential or permuted mnist
     if "mnist" in cfg.data.dataset: 
         from .mnist import MnistDataModule
         return MnistDataModule(cfg)
-    if cfg.data.dataset == "cifar10" or cfg.data.dataset == "scifar10":
+    elif cfg.data.dataset == "cifar10" or cfg.data.dataset == "scifar10":
         from .cifar10 import Cifar10DataModule
         return Cifar10DataModule(cfg)
-    if cfg.data.dataset == "cifar100":
+    elif cfg.data.dataset == "cifar100":
         from .cifar100 import Cifar100DataModule
         return Cifar100DataModule(cfg)
-    if cfg.data.dataset == "stl10":
+    elif cfg.data.dataset == "stl10":
         from .stl10 import STL10DataModule
         return STL10DataModule(cfg)
-    if cfg.data.dataset == "sc_mfcc" or cfg.data.dataset == "sc_raw":
+    elif cfg.data.dataset == "sc_mfcc" or cfg.data.dataset == "sc_raw":
         from .speech import SpeechCommandsModule
         return SpeechCommandsModule(cfg)
+    elif cfg.data.dataset == "pathfinder":
+        from .pathfinder import PathfinderDataModule
+        return PathfinderDataModule(cfg)
+    elif cfg.data.dataset == "image":
+        from .imdb import IMDBDataModule
+        return IMDBDataModule(cfg)
+    elif cfg.data.dataset == "listops":
+        from .listops import ListOpsDataModule
+        return ListOpsDataModule(cfg)
     
     # TODO other dataset
 

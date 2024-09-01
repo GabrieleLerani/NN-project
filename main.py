@@ -95,13 +95,13 @@ def create_trainer(cfg: OmegaConf, logger: TensorBoardLogger, callbacks: list, p
         callbacks=callbacks,
         profiler=profiler,
         # TODO used for testing
-        limit_train_batches=3,
-        limit_val_batches=3,
-        limit_test_batches=3
+        # limit_train_batches=3,
+        # limit_val_batches=3,
+        # limit_test_batches=3
     )
 
 def train(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:
-    if not cfg.load_model.pre_trained:
+    if not cfg.load_model.pre_trained or not exists_checkpoint_path(cfg):
         trainer.fit(model, datamodule)
     # Load the model from a checkpoint
     else:
@@ -121,6 +121,15 @@ def get_checkpoint_path(cfg: OmegaConf) -> str:
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"{checkpoint_path} file doesn't exist")
     return checkpoint_path
+
+def exists_checkpoint_path(cfg: OmegaConf) -> str:
+    filename = f"{cfg.data.dataset}_{cfg.net.no_blocks}_{cfg.net.hidden_channels}"
+    path = os.path.join("checkpoints", filename)
+    # there should be only one file
+    files = os.listdir(path)
+    if len(files) > 0:
+        return True
+    return False
 
 if __name__ == "__main__":
     main()

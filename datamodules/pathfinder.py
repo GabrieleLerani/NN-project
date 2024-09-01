@@ -10,6 +10,7 @@ from PIL import Image
 import pytorch_lightning as pl
 import requests
 import matplotlib.pyplot as plt
+from omegaconf import OmegaConf
 
 
 # There's an empty file in the dataset
@@ -75,14 +76,12 @@ class PathfinderDataset(torch.utils.data.Dataset):
 class PathfinderDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        data_dir,
-        batch_size: int = 32,
-        test_batch_size: int = 32,
-        data_type="default",
-        resolution="32",
-        level="hard",
-        val_split=0.1,
-        test_split=0.1,
+        cfg,
+        data_dir: str = "datasets",
+        resolution = "32",
+        level = "hard",
+        val_split = 0.1,
+        test_split = 0.1,
     ):
         super().__init__()
 
@@ -95,8 +94,8 @@ class PathfinderDataModule(pl.LightningDataModule):
         # Save parameters to self
         data_dir = data_dir + f"/lra_release/pathfinder{resolution}/{level_dir}"
         self.data_dir = Path(data_dir)
-        self.batch_size = batch_size
-        self.test_batch_size = test_batch_size
+        self.type = cfg.data.dataset
+        self.cfg = cfg
 
         self.resolution = resolution
         self.level = level
@@ -106,19 +105,7 @@ class PathfinderDataModule(pl.LightningDataModule):
 
         self.num_workers = 0  # for google colab training
 
-        # Determine data_type
-        if data_type == "default":
-            self.data_type = "image"
-            self.data_dim = 2
-        elif data_type == "sequence":
-            self.data_type = data_type
-            self.data_dim = 1
-        else:
-            raise ValueError(f"data_type {data_type} not supported.")
-
-        # Determine sizes of dataset
-        self.input_channels = 1
-        self.output_channels = 2
+        self._yaml_parameters()
 
     def prepare_data(self):
         if not self.data_dir.is_dir():
@@ -152,7 +139,8 @@ class PathfinderDataModule(pl.LightningDataModule):
 
     def setup(self, stage=None):
         self._set_transform()
-        # self._yaml_parameters()  # TODO set correct params
+
+        self.batch_size = self.cfg.train.batch_size
 
         self.dataset = PathfinderDataset(self.data_dir, transform=self.transform)
         # compute lengths
@@ -166,7 +154,7 @@ class PathfinderDataModule(pl.LightningDataModule):
         self.train_dataset, self.val_dataset, self.test_dataset = random_split(
             self.dataset,
             [train_len, val_len, test_len],
-            generator=torch.Generator().manual_seed(getattr(self, "seed", 42)),
+            generator=torch.Generator(self.cfg.train.accelerator).manual_seed(getattr(self, "seed", 42)),
         )
 
     def _set_transform(self):
@@ -178,7 +166,38 @@ class PathfinderDataModule(pl.LightningDataModule):
         )
 
     def _yaml_parameters(self):
-        pass
+        hidden_channels = self.cfg.net.hidden_channels
+
+        OmegaConf.update(self.cfg, "train.batch_size", 100)
+        OmegaConf.update(self.cfg, "train.epochs", 210)
+        OmegaConf.update(self.cfg, "net.in_channels", 1)
+        OmegaConf.update(self.cfg, "net.out_channels", 2)
+        OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
+
+        if hidden_channels == 140:
+            OmegaConf.update(self.cfg, "train.weight_decay", 0)
+
+            if self.type == "default":
+                OmegaConf.update(self.cfg, "net.data_dim", 2)
+                OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
+                OmegaConf.update(self.cfg, "kernel.omega_0", 1239.14)
+            elif self.type == "sequence":
+                OmegaConf.update(self.cfg, "net.data_dim", 1)
+                OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
+                OmegaConf.update(self.cfg, "kernel.omega_0", 2272.56)
+        elif hidden_channels == 380:
+
+            if self.type == "default":
+                OmegaConf.update(self.cfg, "net.data_dim", 2)
+                OmegaConf.update(self.cfg, "train.weight_decay", 0)
+                OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
+                OmegaConf.update(self.cfg, "kernel.omega_0", 3908.32)
+            elif self.type == "sequence":
+                OmegaConf.update(self.cfg, "net.data_dim", 1)
+                OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
+                OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
+                OmegaConf.update(self.cfg, "kernel.omega_0", 2272.56)
+
 
     def train_dataloader(self):
         train_dataloader = DataLoader(
@@ -193,7 +212,7 @@ class PathfinderDataModule(pl.LightningDataModule):
     def val_dataloader(self):
         val_dataloader = DataLoader(
             self.val_dataset,
-            batch_size=self.test_batch_size,
+            batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
         )
@@ -202,7 +221,7 @@ class PathfinderDataModule(pl.LightningDataModule):
     def test_dataloader(self):
         test_dataloader = DataLoader(
             self.test_dataset,
-            batch_size=self.test_batch_size,
+            batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
         )
@@ -222,7 +241,7 @@ if __name__ == "__main__":
     # torch.set_default_device("mps")
     # prompt: Generate the code to instantiate PathFinderDataModule
     dm = PathfinderDataModule(
-        data_dir="./data/datasets", batch_size=32, test_batch_size=32
+        data_dir="datasets", batch_size=32, test_batch_size=32
     )
     dm.prepare_data()
     dm.setup()
