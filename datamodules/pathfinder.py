@@ -7,18 +7,20 @@ from pathlib import Path
 from hydra import utils
 from typing import Optional, Callable, Tuple, Dict, List, cast
 from omegaconf import OmegaConf
+import os
 
 
 class PathfinderDataset(torch.utils.data.Dataset):
     """Pathfinder dataset created from a list of images."""
 
-    def __init__(self, transform: Optional[Callable] = None) -> None:
+    def __init__(self, data_dir, transform: Optional[Callable] = None) -> None:
         """
         Args:
             img_list (List[Tuple[str, int]]): List of tuples where each tuple contains
                 an image path and its corresponding label.
             transform (Optional[Callable]): Optional transformation function or composition of transformations.
         """
+        self.data_dir = data_dir
         self.img_list = self.create_imagelist()
         self.transform = transform
 
@@ -44,8 +46,24 @@ class PathfinderDataset(torch.utils.data.Dataset):
         return img, label
 
     def create_imagelist(self) -> List[Tuple[str, int]]:
-        # TODO create image list from directories
-        pass
+
+        # root dir where the image are placed
+        directory = Path(directory).expanduser()
+
+        # metadata path where we get the class_idx
+        path_list = sorted(
+            list((directory / "metadata").glob("*.npy")),
+            key=lambda path: int(path.stem),
+        )
+        instances = []
+        for metadata_file in path_list:
+            with open(metadata_file, "r") as f:
+                for metadata in f.read().splitlines():
+                    metadata = metadata.split()
+                    image_path = Path(metadata[0]) / metadata[1]
+                    label = int(metadata[3])
+                    instances.append((str(directory / image_path), label))
+        return instances
 
 
 class PathFinderDataModule(pl.LightningDataModule):

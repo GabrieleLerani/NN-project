@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import random_split, DataLoader
+import torchtext.nn
 from torchvision import transforms, datasets
 import pytorch_lightning as pl
 from PIL import Image
@@ -33,7 +34,6 @@ class IMDBDataModule(pl.LightningDataModule):
 
         self.data_dir = Path(data_dir)
 
-        # Determine data_type
         if data_type == "default":
             self.data_type = "image"
             self.data_dim = 2
@@ -43,57 +43,38 @@ class IMDBDataModule(pl.LightningDataModule):
         else:
             raise ValueError(f"data_type {data_type} not supported.")
 
-        # Determine sizes of dataset
         self.input_channels = 1
         self.output_channels = 2
 
     def prepare_data(self):
-        # download
         self.dataset = load_dataset("imdb", cache_dir=self.data_dir)
         self.dataset = DatasetDict(
             train=self.dataset["train"], test=self.dataset["test"]
         )
-        if self.tokenizer_type == "word":
-            self.tokenizer = torchtext.data.utils.get_tokenizer(
-                "spacy", language="en_core_web_sm"
-            )
-        else:  # self.tokenizer_type == 'char'
-            self.tokenizer = list  # Just convert a string to a list of chars
-        # Account for <bos> and <eos> tokens
-        max_length = self.max_length - int(self.append_bos) - int(self.append_eos)
-        tokenize = lambda example: {
-            "tokens": self.tokenizer(example["text"])[:max_length]
-        }
-        self.dataset = dataset.map(
+
+        tokenizer = torchtext.data.utils.get_tokenizer("basic_english")
+
+        def tokenize(example):
+            return {"tokens": tokenizer(example["text"])[: self.max_length]}
+
+        self.dataset = self.dataset.map(
             tokenize,
             remove_columns=["text"],
-            keep_in_memory=True,
-            load_from_cache_file=False,
             num_proc=self.num_workers,
         )
+
         self.vocab = torchtext.vocab.build_vocab_from_iterator(
-            self.dataset["train"]["tokens"],
-            min_freq=self.vocab_min_freq,
-            specials=(
-                ["<pad>", "<unk>"]
-                + (["<bos>"] if self.append_bos else [])
-                + (["<eos>"] if self.append_eos else [])
-            ),
+            self.dataset["train"]["tokens"], min_freq=1, specials=["<pad>", "<unk>"]
         )
         self.vocab.set_default_index(self.vocab["<unk>"])
 
-        numericalize = lambda example: {
-            "input_ids": self.vocab(
-                (["<bos>"] if self.append_bos else [])
-                + example["tokens"]
-                + (["<eos>"] if self.append_eos else [])
-            )
-        }
+        def numericalize(example):
+            input_ids = self.vocab(example["tokens"])
+            return {"input_ids": input_ids}
+
         self.dataset = self.dataset.map(
             numericalize,
             remove_columns=["tokens"],
-            keep_in_memory=True,
-            load_from_cache_file=False,
             num_proc=self.num_workers,
         )
 
@@ -105,28 +86,39 @@ class IMDBDataModule(pl.LightningDataModule):
         self.vocab_size = len(self.vocab)
         self.dataset.set_format(type="torch", columns=["input_ids", "label"])
 
-        # Create all splits
         self.train_dataset, self.test_dataset = (
             self.dataset["train"],
             self.dataset["test"],
         )
 
         def collate_batch(batch):
-            xs, ys = zip(*[(data["input_ids"], data["label"]) for data in batch])
-            # lengths = torch.tensor([len(x) for x in xs])
-            xs = torch.stack(
-                [
-                    torch.nn.functional.pad(
-                        x,
-                        [self.max_length - x.shape[-1], 0],
-                        value=float(self.vocab["<pad>"]),
-                    )
-                    for x in xs
-                ]
+            input_ids = [data["input_ids"] for data in batch]
+            labels = [data["label"] for data in batch]
+
+            pad_value = float(self.vocab["<pad>"])
+
+            padded_input_ids = torch.nn.utils.rnn.pad_sequence(
+                input_ids, batch_first=True, padding_value=pad_value
             )
-            xs = xs.unsqueeze(1).float()
-            ys = torch.tensor(ys)
-            return xs, ys
+
+            if padded_input_ids.size(1) > self.max_length:
+                padded_input_ids = padded_input_ids[
+                    :, -self.max_length :
+                ]  # truncate to max_length
+            else:
+                # Pad to max_length on the left (if needed)
+                padding_size = self.max_length - padded_input_ids.size(1)
+                padded_input_ids = torch.nn.functional.pad(
+                    padded_input_ids,
+                    (padding_size, 0),  # pad on the left
+                    value=pad_value,
+                )
+
+            input_tensor = padded_input_ids.unsqueeze(1).float()
+
+            label_tensor = torch.tensor(labels)
+
+            return input_tensor, label_tensor
 
         self.collate_fn = collate_batch
 
@@ -170,7 +162,6 @@ class IMDBDataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2985.63)
 
-    # we define a separate DataLoader for each of train/val/test
     def train_dataloader(self):
         train_dataloader = DataLoader(
             self.train_dataset,
@@ -207,19 +198,4 @@ class IMDBDataModule(pl.LightningDataModule):
 
 
 if __name__ == "__main__":
-    # TODO create this list in the dataset init in tghis format
-    img_list = [
-        # ("path/to/image1.jpg", 0),
-        # ("path/to/image2.jpg", 1),
-        # Add more image paths and labels
-    ]
-
-    # Define any transformations you want to apply
-    transform = transforms.Compose(
-        [
-            transforms.Resize((128, 128)),
-            transforms.ToTensor(),
-        ]
-    )
-
-    dataset = PathfinderDataset(img_list=img_list, transform=transform)
+    pass

@@ -11,10 +11,6 @@ import torchtext
 from datasets import load_dataset, DatasetDict
 
 
-def listops_tokenizer(s):
-    return s.translate({ord("]"): ord("X"), ord("("): None, ord(")"): None}).split()
-
-
 class ListOpsDataModule(pl.LightningDataModule):
     def __init__(
         self,
@@ -51,8 +47,7 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.output_channels = 2
 
     def prepare_data(self):
-        # download, not required
-        dataset = load_dataset(
+        self.dataset = load_dataset(
             "csv",
             data_files={
                 "train": str(self.data_dir / "basic_train.tsv"),
@@ -63,59 +58,35 @@ class ListOpsDataModule(pl.LightningDataModule):
             keep_in_memory=True,
         )
 
+        def listops_tokenizer(s):
+            return s.translate(
+                {ord("]"): ord("X"), ord("("): None, ord(")"): None}
+            ).split()
+
         tokenizer = listops_tokenizer
-        # Account for <bos> and <eos> tokens
-        max_length = self.max_length - int(self.append_bos) - int(self.append_eos)
-        tokenize = lambda example: {"tokens": tokenizer(example["Source"])[:max_length]}
-        dataset = dataset.map(
+
+        def tokenize(example):
+            return {"tokens": tokenizer(example["Source"])[: self.max_length]}
+
+        self.dataset = self.dataset.map(
             tokenize,
-            remove_columns=["Source"],
-            keep_in_memory=True,
-            load_from_cache_file=False,
+            remove_columns=["text"],
             num_proc=self.num_workers,
         )
-        vocab = torchtext.vocab.build_vocab_from_iterator(
-            dataset["train"]["tokens"],
-            specials=(
-                ["<pad>", "<unk>"]
-                + (["<bos>"] if self.append_bos else [])
-                + (["<eos>"] if self.append_eos else [])
-            ),
-        )
-        vocab.set_default_index(vocab["<unk>"])
 
-        numericalize = lambda example: {
-            "input_ids": vocab(
-                (["<bos>"] if self.append_bos else [])
-                + example["tokens"]
-                + (["<eos>"] if self.append_eos else [])
-            )
-        }
-        dataset = dataset.map(
+        self.vocab = torchtext.vocab.build_vocab_from_iterator(
+            self.dataset["train"]["tokens"], min_freq=1, specials=["<pad>", "<unk>"]
+        )
+        self.vocab.set_default_index(self.vocab["<unk>"])
+
+        def numericalize(example):
+            input_ids = self.vocab(example["tokens"])
+            return {"input_ids": input_ids}
+
+        self.dataset = self.dataset.map(
             numericalize,
             remove_columns=["tokens"],
-            keep_in_memory=True,
-            load_from_cache_file=False,
             num_proc=self.num_workers,
-        )
-
-        self._save_to_cache(dataset, tokenizer, vocab)
-
-    def setup(self, stage=None):
-
-        self.dataset = IMDBDataset(self.data_dir, transform=self.transform)
-        # compute lengths
-
-        len_dataset = len(self.dataset)
-        val_len = int(self.val_split * len_dataset)
-        test_len = int(self.test_split * len_dataset)
-        train_len = len_dataset - val_len - test_len
-
-        # splits
-        self.train_dataset, self.val_dataset, self.test_dataset = random_split(
-            self.dataset,
-            [train_len, val_len, test_len],
-            generator=torch.Generator().manual_seed(getattr(self, "seed", 42)),
         )
 
     def setup(self, stage=None):
@@ -126,7 +97,6 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.vocab_size = len(self.vocab)
         dataset.set_format(type="torch", columns=["input_ids", "Target"])
 
-        # Create all splits
         self.train_dataset, self.val_dataset, self.test_dataset = (
             dataset["train"],
             dataset["val"],
@@ -135,7 +105,6 @@ class ListOpsDataModule(pl.LightningDataModule):
 
         def collate_batch(batch):
             xs, ys = zip(*[(data["input_ids"], data["Target"]) for data in batch])
-            # lengths = torch.tensor([len(x) for x in xs])
             xs = torch.stack(
                 [
                     torch.nn.functional.pad(
@@ -147,7 +116,6 @@ class ListOpsDataModule(pl.LightningDataModule):
                 ]
             )
             xs = xs.unsqueeze(1).float()
-            # xs = nn.utils.rnn.pad_sequence(xs, padding_value=self.vocab['<pad>'], batch_first=True)
             ys = torch.tensor(ys)
             return xs, ys
 
@@ -229,19 +197,4 @@ class ListOpsDataModule(pl.LightningDataModule):
 
 
 if __name__ == "__main__":
-    # TODO create this list in the dataset init in tghis format
-    img_list = [
-        # ("path/to/image1.jpg", 0),
-        # ("path/to/image2.jpg", 1),
-        # Add more image paths and labels
-    ]
-
-    # Define any transformations you want to apply
-    transform = transforms.Compose(
-        [
-            transforms.Resize((128, 128)),
-            transforms.ToTensor(),
-        ]
-    )
-
-    dataset = PathfinderDataset(img_list=img_list, transform=transform)
+    pass
