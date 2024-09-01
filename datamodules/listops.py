@@ -104,20 +104,39 @@ class ListOpsDataModule(pl.LightningDataModule):
         )
 
         def collate_batch(batch):
-            xs, ys = zip(*[(data["input_ids"], data["Target"]) for data in batch])
-            xs = torch.stack(
-                [
-                    torch.nn.functional.pad(
-                        x,
-                        [self.max_length - x.shape[-1], 0],
-                        value=float(self.vocab["<pad>"]),
-                    )
-                    for x in xs
-                ]
+            # Extract input sequences (input_ids) and labels from the batch
+            input_ids = [data["input_ids"] for data in batch]
+            labels = [data["Target"] for data in batch]
+
+            # Determine the padding value for sequences
+            pad_value = float(self.vocab["<pad>"])
+
+            # Pad the input sequences to the specified max_length
+            padded_input_ids = torch.nn.utils.rnn.pad_sequence(
+                input_ids, batch_first=True, padding_value=pad_value
             )
-            xs = xs.unsqueeze(1).float()
-            ys = torch.tensor(ys)
-            return xs, ys
+
+            # Truncate or pad the sequences to ensure they are all max_length
+            if padded_input_ids.size(1) > self.max_length:
+                padded_input_ids = padded_input_ids[
+                    :, -self.max_length :
+                ]  # truncate to max_length
+            else:
+                # Pad to max_length on the left (if needed)
+                padding_size = self.max_length - padded_input_ids.size(1)
+                padded_input_ids = torch.nn.functional.pad(
+                    padded_input_ids,
+                    (padding_size, 0),  # pad on the left
+                    value=pad_value,
+                )
+
+            # Add an extra dimension to the input and convert to float
+            input_tensor = padded_input_ids.unsqueeze(1).float()
+
+            # Convert labels to tensor
+            label_tensor = torch.tensor(labels)
+
+            return input_tensor, label_tensor
 
         self.collate_fn = collate_batch
 
