@@ -48,7 +48,7 @@ class PathfinderDataset(torch.utils.data.Dataset):
     def create_imagelist(self) -> List[Tuple[str, int]]:
 
         # root dir where the image are placed
-        directory = Path(directory).expanduser()
+        directory = Path(self.data_dir).expanduser()
 
         # metadata path where we get the class_idx
         path_list = sorted(
