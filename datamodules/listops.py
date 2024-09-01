@@ -6,7 +6,7 @@ import tarfile
 import torch
 from pathlib import Path
 from transformers import AutoTokenizer
-from datasets import load_dataset
+from datasets import load_dataset, DatasetDict
 
 
 from torchvision import transforms
@@ -182,7 +182,7 @@ class ListOpsDataModule(pl.LightningDataModule):
             self.dataset["test"],
         )
 
-        def collate_batch(self, batch):
+        def collate_batch(batch):
             input_ids = [data["input_ids"] for data in batch]
             labels = [
                 data["Target"] for data in batch
@@ -260,7 +260,7 @@ if __name__ == "__main__":
 
 if __name__ == "__main__":
     dm = ListOpsDataModule(
-        data_dir="./data/dataset",
+        data_dir="./data",
         batch_size=32,
         test_batch_size=32,
         data_type="default",
