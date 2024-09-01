@@ -15,8 +15,12 @@ kernel:
   fft_threshold: 50
   omega_0: 20
 
+load_model:
+  pre_trained: False
+  model_file: ""
+  epoch: 0
+  step: 0
 
-pre_trained: False
 
 train:
   logger: True
@@ -44,6 +48,7 @@ data:
   data_dir : "datasets"
   dataset : "cifar10"
   reduced_dataset: False
+  
 
 # Comment the two sections below to make hydra generate the files again
 defaults:  
