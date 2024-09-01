@@ -18,19 +18,20 @@ def main(cfg: OmegaConf) -> None:
 
     # 1. Create the dataset
     datamodule = get_data_module(cfg)
+    
+    print("################# Received configuration: #################")
+    print(OmegaConf.to_yaml(cfg))
+    
     # 2. Create the model
     model = create_model(cfg)
     # 3. Create the logger, callbacks, profiler and trainer
     logger, callbacks, profiler = setup_trainer_components(cfg)
     trainer = create_trainer(cfg, logger, callbacks, profiler)
 
-    print("################# Received configuration: #################")
-    print(OmegaConf.to_yaml(cfg))
     # 4. Train the model or use a pretrained one
-    if not cfg.pre_trained:
-        train_and_evaluate(trainer, model, datamodule, callbacks)
-    else:
-        load_and_predict(trainer, model, datamodule, callbacks)
+    train(cfg, trainer, model, datamodule)
+    
+    
 
 def create_model(cfg: OmegaConf) -> CCNN:
     return CCNN(
@@ -99,17 +100,25 @@ def create_trainer(cfg: OmegaConf, logger: TensorBoardLogger, callbacks: list, p
         #limit_test_batches=3
     )
 
-def train_and_evaluate(trainer: pl.Trainer, model: CCNN, datamodule, callbacks: list) -> None:
-    trainer.fit(model, datamodule)
+def train(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:
+    if not cfg.load_model.pre_trained:
+        trainer.fit(model, datamodule)
+    # Load the model from a checkpoint
+    else:
+        trainer.fit(model=model, train_dataloaders=datamodule, ckpt_path=get_checkpoint_path(cfg))
+
     trainer.validate(model, datamodule)
     trainer.test(model, datamodule)
-    checkpoint_callback = next(cb for cb in callbacks if isinstance(cb, ModelCheckpoint))
-    print("Finished training, best model path: ", checkpoint_callback.best_model_path)
 
-def load_and_predict(trainer: pl.Trainer, model: CCNN, datamodule, path: str) -> None:
-    # TODO check how you take the best model path
-    model = model.load_from_checkpoint(path)
-    trainer.predict(model, datamodule)
+
+def get_checkpoint_path(cfg: OmegaConf) -> str:
+    filename = f"{cfg.data.dataset}_{cfg.net.no_blocks}_{cfg.net.hidden_channels}"
+    path = os.path.join("checkpoints", filename)
+    checkpoint_path = os.path.join(path, f"epoch={cfg.load_model.epoch}-step={cfg.load_model.step}.ckpt")
+
+    if not os.path.exists(checkpoint_path):
+        raise FileNotFoundError(f"{checkpoint_path} file doesn't exist")
+    return checkpoint_path
 
 if __name__ == "__main__":
     main()
