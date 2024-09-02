@@ -9,15 +9,14 @@ import pytorch_lightning as pl
 from datasets import load_dataset, DatasetDict
 
 from transformers import AutoTokenizer
+from omegaconf import OmegaConf
 
 
 class IMDBDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        data_dir,
-        batch_size,
-        test_batch_size,
-        data_type,
+        cfg,
+        data_dir: str = "datasets",
         max_length=4096,
         tokenizer_type="word",
         tokenizer_name="bert-base-uncased",
@@ -35,7 +34,6 @@ class IMDBDataModule(pl.LightningDataModule):
 
         # Save parameters to self
         self.data_dir = Path(data_dir) / "IMDB"
-        self.batch_size = batch_size
         self.test_batch_size = test_batch_size
         self.num_workers = 7
 
@@ -48,15 +46,16 @@ class IMDBDataModule(pl.LightningDataModule):
         self.tokenizer_name = tokenizer_name
 
         # Determine data_type
-        if data_type == "default":
-            self.data_type = "sequence"
-            self.data_dim = 1
-        else:
-            raise ValueError(f"data_type {data_type} not supported.")
+        self.data_type = "sequence"
+        self.data_dim = 1
+        self.type = cfg.data.dataset
+        self.cfg = cfg
 
         # Determine sizes of dataset
         self.input_channels = 1
         self.output_channels = 2
+
+        self._yaml_parameters()
 
     def prepare_data(self):
         serialized_dataset_path = os.path.join(self.data_dir, "tokenized_dataset")
@@ -110,7 +109,8 @@ class IMDBDataModule(pl.LightningDataModule):
     def setup(self, stage=None):
 
         self._set_transform()
-        self._yaml_parameters()
+
+        self.batch_size = self.cfg.train.batch_size
 
         self.dataset.set_format(type="torch", columns=["input_ids", "label"])
 
@@ -161,7 +161,45 @@ class IMDBDataModule(pl.LightningDataModule):
         )
 
     def _yaml_parameters(self):
-        pass
+        hidden_channels = self.cfg.net.hidden_channels
+
+        OmegaConf.update(self.cfg, "train.batch_size", 50)
+        OmegaConf.update(self.cfg, "train.epochs", 210)
+        OmegaConf.update(self.cfg, "net.in_channels", 1)
+        OmegaConf.update(self.cfg, "net.out_channels", 2)
+
+        if hidden_channels == 140:
+
+            if self.type == "default":
+                OmegaConf.update(self.cfg, "net.data_dim", 2)
+                OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
+
+                OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
+                OmegaConf.update(self.cfg, "kernel.omega_0", 2085.43)
+                OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
+
+            elif self.type == "sequence":
+                OmegaConf.update(self.cfg, "train.weight_decay", 0)
+                OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
+
+                OmegaConf.update(self.cfg, "net.data_dim", 1)
+                OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
+                OmegaConf.update(self.cfg, "kernel.omega_0", 4005.15)
+        elif hidden_channels == 380:
+            OmegaConf.update(self.cfg, "train.weight_decay", 0)
+
+            if self.type == "default":
+                OmegaConf.update(self.cfg, "net.data_dim", 2)
+                OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
+
+                OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
+                OmegaConf.update(self.cfg, "kernel.omega_0", 2306.08)
+            elif self.type == "sequence":
+                OmegaConf.update(self.cfg, "net.data_dim", 1)
+                OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
+
+                OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
+                OmegaConf.update(self.cfg, "kernel.omega_0", 4005.15)
 
     def train_dataloader(self):
         train_dataloader = DataLoader(
@@ -177,7 +215,7 @@ class IMDBDataModule(pl.LightningDataModule):
     def val_dataloader(self):
         val_dataloader = DataLoader(
             self.val_dataset,
-            batch_size=self.test_batch_size,
+            batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
@@ -187,16 +225,12 @@ class IMDBDataModule(pl.LightningDataModule):
     def test_dataloader(self):
         test_dataloader = DataLoader(
             self.test_dataset,
-            batch_size=self.test_batch_size,
+            batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
         )
         return test_dataloader
-
-
-if __name__ == "__main__":
-    pass
 
 
 if __name__ == "__main__":
