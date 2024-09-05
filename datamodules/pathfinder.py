@@ -78,10 +78,10 @@ class PathfinderDataModule(pl.LightningDataModule):
         self,
         cfg,
         data_dir: str = "datasets",
-        resolution = "32",
-        level = "hard",
-        val_split = 0.1,
-        test_split = 0.1,
+        resolution="32",
+        level="hard",
+        val_split=0.1,
+        test_split=0.1,
     ):
         super().__init__()
 
@@ -154,7 +154,9 @@ class PathfinderDataModule(pl.LightningDataModule):
         self.train_dataset, self.val_dataset, self.test_dataset = random_split(
             self.dataset,
             [train_len, val_len, test_len],
-            generator=torch.Generator(self.cfg.train.accelerator).manual_seed(getattr(self, "seed", 42)),
+            generator=torch.Generator(self.cfg.train.accelerator).manual_seed(
+                getattr(self, "seed", 42)
+            ),
         )
 
     def _set_transform(self):
@@ -198,7 +200,6 @@ class PathfinderDataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2272.56)
 
-
     def train_dataloader(self):
         train_dataloader = DataLoader(
             self.train_dataset,
@@ -240,8 +241,11 @@ if __name__ == "__main__":
 
     # torch.set_default_device("mps")
     # prompt: Generate the code to instantiate PathFinderDataModule
+
+    cfg = OmegaConf.load("config/config.yaml")
     dm = PathfinderDataModule(
-        data_dir="datasets", batch_size=32, test_batch_size=32
+        cfg=cfg,
+        data_dir="data/datasets",
     )
     dm.prepare_data()
     dm.setup()
