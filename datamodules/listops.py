@@ -35,18 +35,14 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.tokenizer = None
 
         # Determine data_type
-        self.data_type = "sequence"
-        self.data_dim = 1
-        self.type = cfg.data.dataset
+        self.type = cfg.data.type
         self.cfg = cfg
-
-        # Determine sizes of dataset
-        self.input_channels = 1
-        self.output_channels = 10
 
         self._yaml_parameters()
 
     def prepare_data(self):
+
+        # TODO alternatively to load the dataset dataset_listops = load_dataset("allenai/lra_listops")
 
         if not self.data_dir.is_dir():
             self.download_and_extract_lra_release(self.data_dir)
@@ -275,11 +271,12 @@ if __name__ == "__main__":
 
 
 if __name__ == "__main__":
+
+    cfg = OmegaConf.load("config/config.yaml")
+
     dm = ListOpsDataModule(
-        data_dir="./data",
-        batch_size=32,
-        test_batch_size=32,
-        data_type="default",
+        cfg=cfg,
+        data_dir="data/datasets",
     )
     dm.prepare_data()
     dm.setup()

@@ -8,102 +8,45 @@ import pytorch_lightning as pl
 
 from datasets import load_dataset, DatasetDict
 
-from transformers import AutoTokenizer
 from omegaconf import OmegaConf
 
 
-class IMDBDataModule(pl.LightningDataModule):
+class ImageDataModule(pl.LightningDataModule):
+    """
+    Image Classification Dataset from LRA benchmarks, exploiting Cifar10 dataset (1D or 2D)
+    """
+
     def __init__(
         self,
         cfg,
         data_dir: str = "datasets",
-        max_length=4096,
-        tokenizer_type="word",
-        tokenizer_name="bert-base-uncased",
-        vocab_min_freq=15,
-        append_bos=False,
-        append_eos=True,
         val_split=0.0,
     ):
-        assert tokenizer_type in [
-            "word",
-            "char",
-        ], f"tokenizer_type {tokenizer_type} not supported"
 
         super().__init__()
 
         # Save parameters to self
-        self.data_dir = Path(data_dir) / "IMDB"
+        self.data_dir = Path(data_dir) / "IMAGE_LRA"
         self.num_workers = 7
 
-        self.max_length = max_length
-        self.tokenizer_type = tokenizer_type
-        self.vocab_min_freq = vocab_min_freq
-        self.append_bos = append_bos
-        self.append_eos = append_eos
         self.val_split = val_split
-        self.tokenizer_name = tokenizer_name
 
         # Determine data_type
-        self.data_type = "sequence"
-        self.data_dim = 1
         self.type = cfg.data.dataset
         self.cfg = cfg
-
-        # Determine sizes of dataset
-        self.input_channels = 1
-        self.output_channels = 2
 
         self._yaml_parameters()
 
     def prepare_data(self):
-        serialized_dataset_path = os.path.join(self.data_dir, "tokenized_dataset")
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            self.tokenizer_name, use_fast=True
-        )
-
-        if os.path.exists(serialized_dataset_path):
-            print(f"Loading dataset from {serialized_dataset_path}...")
-            self.dataset = DatasetDict.load_from_disk(serialized_dataset_path)
-        else:
-            dataset = load_dataset("imdb", cache_dir=self.data_dir)
-
-            # Initialize tokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.tokenizer_name, use_fast=True
-            )
-            self.tokenizer.add_special_tokens(
-                {"additional_special_tokens": ["<bos>", "<eos>"]}
-            )
-
-            def tokenize_function(example):
-                encoding = self.tokenizer(
-                    example["text"],
-                    truncation=True,
-                    padding="max_length",
-                    max_length=self.max_length,
-                    return_tensors="pt",
+        if not self.data_dir.is_dir():
+            if self.type == "sequence":  # default
+                self.dataset = load_dataset(
+                    "allenai/lra_image", "cifar10", cache_dir=self.data_dir
                 )
-                return {
-                    "input_ids": encoding["input_ids"]
-                    .squeeze()
-                    .tolist()  # Convert tensor to list
-                }
-
-            # Tokenize and map to dataset
-            tokenized_datasets = dataset.map(
-                tokenize_function,
-                batched=True,
-                remove_columns=["text"],
-                keep_in_memory=True,
-                load_from_cache_file=False,
-                num_proc=self.num_workers,
-            )
-
-            self.dataset = tokenized_datasets
-
-            print(f"Saving dataset to {serialized_dataset_path}...")
-            self.dataset.save_to_disk(serialized_dataset_path)
+            elif self.data_type == "default":
+                self.dataset = load_dataset(
+                    "allenai/lra_image", "cifar10_images", cache_dir=self.data_dir
+                )
 
     def setup(self, stage=None):
 
@@ -117,9 +60,6 @@ class IMDBDataModule(pl.LightningDataModule):
             self.dataset["train"],
             self.dataset["test"],
         )
-
-        # Use tokenizer padding token ID
-        self.pad_token_id = self.tokenizer.pad_token_id
 
         def collate_batch(batch):
             input_ids = [data["input_ids"] for data in batch]
@@ -234,11 +174,10 @@ class IMDBDataModule(pl.LightningDataModule):
 
 if __name__ == "__main__":
 
-    dm = IMDBDataModule(
+    cfg = OmegaConf.load("config/config.yaml")
+    dm = ImageDataModule(
+        cfg=cfg,
         data_dir="./data/datasets",
-        batch_size=32,
-        test_batch_size=32,
-        data_type="default",
     )
     dm.prepare_data()
     dm.setup()

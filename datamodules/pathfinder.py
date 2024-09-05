@@ -91,10 +91,12 @@ class PathfinderDataModule(pl.LightningDataModule):
             "hard": "curv_contour_length_14",
         }[level]
 
+        # TODO dataset_pathfinderx = load_dataset("allenai/lra_pathfinder", "pathfinderx")
+
         # Save parameters to self
         data_dir = data_dir + f"/lra_release/pathfinder{resolution}/{level_dir}"
         self.data_dir = Path(data_dir)
-        self.type = cfg.data.dataset
+        self.type = cfg.data.type
         self.cfg = cfg
 
         self.resolution = resolution
