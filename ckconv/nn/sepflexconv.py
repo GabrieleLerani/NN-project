@@ -219,7 +219,7 @@ class SepFlexConv(nn.Module):
         
         size = torch.tensor(self.masked_kernel.shape[2:]) # -> [33,33] for data_dim=2
         # fftconv is used when the size of the kernel is large enough
-        if self.conv_type == "fftconv" and torch.all(size > self.fft_thresold):
+        if self.conv_type == "fftconv" and torch.all(size > self.fft_threshold):
             out = fftconv(x=x, kernel=self.masked_kernel, bias=self.bias)
         else:
             out = conv(x=x, kernel=self.masked_kernel, bias=self.bias)
