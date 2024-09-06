@@ -7,6 +7,7 @@ import torch
 from pathlib import Path
 from transformers import AutoTokenizer
 from datasets import load_dataset, DatasetDict
+from omegaconf import OmegaConf
 
 
 from torchvision import transforms
@@ -15,10 +16,8 @@ from torchvision import transforms
 class ListOpsDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        data_dir,
-        batch_size,
-        test_batch_size,
-        data_type,
+        cfg,
+        data_dir: str = "datasets",
         max_length=512,  # Ensure this matches the model's max length
         append_bos=False,
         append_eos=True,
@@ -26,8 +25,6 @@ class ListOpsDataModule(pl.LightningDataModule):
     ):
         super().__init__()
         self.data_dir = Path(data_dir) / "datasets"
-        self.batch_size = batch_size
-        self.test_batch_size = test_batch_size
         self.num_workers = 7
 
         self.max_length = max_length
@@ -38,17 +35,14 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.tokenizer = None
 
         # Determine data_type
-        if data_type == "default":
-            self.data_type = "sequence"
-            self.data_dim = 1
-        else:
-            raise ValueError(f"data_type {data_type} not supported.")
+        self.type = cfg.data.type
+        self.cfg = cfg
 
-        # Determine sizes of dataset
-        self.input_channels = 1
-        self.output_channels = 10
+        self._yaml_parameters()
 
     def prepare_data(self):
+
+        # TODO alternatively to load the dataset dataset_listops = load_dataset("allenai/lra_listops")
 
         if not self.data_dir.is_dir():
             self.download_and_extract_lra_release(self.data_dir)
@@ -172,7 +166,8 @@ class ListOpsDataModule(pl.LightningDataModule):
 
     def setup(self, stage=None):
         self._set_transform()
-        self._yaml_parameters()  # TODO set correct params
+
+        self.batch_size = self.cfg.train.batch_size
 
         self.dataset.set_format(type="torch", columns=["input_ids", "Target"])
 
@@ -223,7 +218,26 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.transform = transforms.Compose([transforms.ToTensor()])
 
     def _yaml_parameters(self):
-        pass
+        hidden_channels = self.cfg.net.hidden_channels
+
+        OmegaConf.update(self.cfg, "train.batch_size", 50)
+        OmegaConf.update(self.cfg, "train.epochs", 60)
+        OmegaConf.update(self.cfg, "net.in_channels", 1)
+        OmegaConf.update(self.cfg, "net.out_channels", 10)
+        OmegaConf.update(self.cfg, "train.learning_rate", 0.001)
+        OmegaConf.update(self.cfg, "kernel.omega_0", 784.66)
+
+        if hidden_channels == 140:
+            OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
+            OmegaConf.update(self.cfg, "net.data_dim", 1)
+            OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
+            OmegaConf.update(self.cfg, "kernel.omega_0", 2272.56)
+        elif hidden_channels == 380:
+
+            OmegaConf.update(self.cfg, "net.data_dim", 1)
+            OmegaConf.update(self.cfg, "train.weight_decay", 0)
+            OmegaConf.update(self.cfg, "train.dropout_rate", 0.25)
+            OmegaConf.update(self.cfg, "kernel.omega_0", 2272.56)
 
     def train_dataloader(self):
         return DataLoader(
@@ -238,18 +252,16 @@ class ListOpsDataModule(pl.LightningDataModule):
     def val_dataloader(self):
         return DataLoader(
             self.val_dataset,
-            batch_size=self.test_batch_size,
+            batch_size=self.batch_size,
             shuffle=False,
-            pin_memory=self.pin_memory,
             collate_fn=self.collate_fn,
         )
 
     def test_dataloader(self):
         return DataLoader(
             self.test_dataset,
-            batch_size=self.test_batch_size,
+            batch_size=self.batch_size,
             shuffle=False,
-            pin_memory=self.pin_memory,
             collate_fn=self.collate_fn,
         )
 
@@ -259,11 +271,12 @@ if __name__ == "__main__":
 
 
 if __name__ == "__main__":
+
+    cfg = OmegaConf.load("config/config.yaml")
+
     dm = ListOpsDataModule(
-        data_dir="./data",
-        batch_size=32,
-        test_batch_size=32,
-        data_type="default",
+        cfg=cfg,
+        data_dir="data/datasets",
     )
     dm.prepare_data()
     dm.setup()

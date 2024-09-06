@@ -28,7 +28,7 @@ def get_data_module(cfg : OmegaConf):
         from .pathfinder import PathfinderDataModule
         return PathfinderDataModule(cfg)
     elif cfg.data.dataset == "image":
-        from .imdb import IMDBDataModule
+        from .text import IMDBDataModule
         return IMDBDataModule(cfg)
     elif cfg.data.dataset == "listops":
         from .listops import ListOpsDataModule

@@ -46,6 +46,7 @@ test:
 data:
   data_dir : "datasets"
   dataset : "cifar10"
+  type: "default"
   reduced_dataset: False
   
 
