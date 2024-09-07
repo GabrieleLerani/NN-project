@@ -146,7 +146,8 @@ class PathfinderDataModule(pl.LightningDataModule):
 
         # Extract the tar.gz file
         with tarfile.open(local_filename, "r:gz") as tar:
-            tar.extractall(path=data_dir)
+            for member in tqdm(tar.getmembers(), desc='Extracting'):
+                tar.extract(member)
 
         # Optionally, remove the tar.gz file after extraction
         os.remove(local_filename)

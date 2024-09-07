@@ -45,7 +45,7 @@ test:
 
 data:
   data_dir : "datasets"
-  dataset : "pathfinder"
+  dataset : "sc_raw"
   type: "default"
   reduced_dataset: False
   

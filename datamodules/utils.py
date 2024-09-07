@@ -43,7 +43,7 @@ def split_data(tensor, stratify):
         testval_tensor,
         train_stratify,
         testval_stratify,
-    ) = sklearn.train .train_test_split(
+    ) = sklearn.model_selection.train_test_split(
         tensor,
         stratify,
         train_size=0.7,

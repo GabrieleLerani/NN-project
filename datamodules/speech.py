@@ -12,9 +12,9 @@ class SpeechCommandsModule(L.LightningDataModule):
     def __init__(self, cfg, data_dir : str = "datasets"):
         super().__init__()
         self.data_dir = data_dir
-        self.data_processed_location = self.data_dir + "/SpeechCommands/processed_data"
-        self.download_location = self.data_dir + "/SpeechCommands/speech_commands_v0.02"
         self.type = cfg.data.dataset
+        self.data_processed_location = self.data_dir + "/SpeechCommands/processed_data/" + self.type
+        self.download_location = self.data_dir + "/SpeechCommands/speech_commands_v0.02"
         self.cfg = cfg
         self.num_workers = 0 # for google colab training
         self._yaml_parameters()
@@ -53,7 +53,6 @@ class SpeechCommandsModule(L.LightningDataModule):
                 batch_index += 1
             y_index += 1
 
-
         # If MFCC, then we compute these coefficients.
         if self.type == "sc_mfcc":
             x = torchaudio.transforms.MFCC(
@@ -72,7 +71,6 @@ class SpeechCommandsModule(L.LightningDataModule):
 
         train_x, val_x, test_x = split_data(x, y)
         train_y, val_y, test_y = split_data(y, y)
-
         
         return (
             train_x,
@@ -115,7 +113,7 @@ class SpeechCommandsModule(L.LightningDataModule):
             OmegaConf.update(self.cfg, "train.epochs", 160)
             OmegaConf.update(self.cfg, "kernel.omega_0", 1295.61)
         elif self.type == "sc_mfcc":
-            OmegaConf.update(self.cfg, "net.in_channels", )
+            OmegaConf.update(self.cfg, "net.in_channels", 20)
             OmegaConf.update(self.cfg, "train.batch_size", 100)
             OmegaConf.update(self.cfg, "train.epochs", 110)
             OmegaConf.update(self.cfg, "kernel.omega_0", 750.18)
