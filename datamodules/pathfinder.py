@@ -146,10 +146,6 @@ class PathfinderDataModule(pl.LightningDataModule):
 
 
     def extract_lra_release(self, data_dir):
-        if os.path.exists(Path(data_dir) / "lra_release" / "lra_release.gz"):
-            print("Zip already downloaded. Skipping download.")
-            return
-        
         local_filename = os.path.join(data_dir, "lra_release.gz")
 
         # Extract the tar.gz file
