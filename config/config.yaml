@@ -45,7 +45,7 @@ test:
 
 data:
   data_dir : "datasets"
-  dataset : "cifar10"
+  dataset : "pathfinder"
   type: "default"
   reduced_dataset: False
   

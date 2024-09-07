@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, Callable, Tuple, List
 
 import torch
+from tqdm import tqdm
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from PIL import Image
@@ -127,10 +128,21 @@ class PathfinderDataModule(pl.LightningDataModule):
 
         # Download the file
         with requests.get(url, stream=True) as r:
+            total = int(r.headers.get('content-length', 0))
             r.raise_for_status()
-            with open(local_filename, "wb") as f:
+            with open(
+                local_filename,
+                "wb"
+            ) as f, tqdm(
+                desc=local_filename,
+                total=total,
+                unit='iB',
+                unit_scale=True,
+                unit_divisor=1024,
+            ) as bar:                    
                 for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
+                    size = f.write(chunk)
+                    bar.update(size)
 
         # Extract the tar.gz file
         with tarfile.open(local_filename, "r:gz") as tar:
