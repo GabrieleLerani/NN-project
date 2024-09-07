@@ -112,19 +112,19 @@ class PathfinderDataModule(pl.LightningDataModule):
 
     def prepare_data(self):
         if not self.data_dir.is_dir():
-            self.download_and_extract_lra_release(self.data_dir)
+            # Create data directory if it doesn't exist
+            os.makedirs(self.data_dir, exist_ok=True)
 
-    def download_and_extract_lra_release(self, data_dir):
-        if os.path.exists(Path(data_dir) / "lra_release"):
-            print(
-                f"Directory {data_dir} already exists. Skipping download and extraction."
-            )
-            return
+            if not os.path.exists(Path(self.data_dir) / "lra_release" / "lra_release.gz"):
+                self.download_lra_release(self.data_dir)
+            else:
+                print("Zip already downloaded. Skipping download.")
+
+            self.extract_lra_release(self.data_dir)
+
+    def download_lra_release(self, data_dir):
         url = "https://storage.googleapis.com/long-range-arena/lra_release.gz"
         local_filename = os.path.join(data_dir, "lra_release.gz")
-
-        # Create data directory if it doesn't exist
-        os.makedirs(data_dir, exist_ok=True)
 
         # Download the file
         with requests.get(url, stream=True) as r:
@@ -144,6 +144,14 @@ class PathfinderDataModule(pl.LightningDataModule):
                     size = f.write(chunk)
                     bar.update(size)
 
+
+    def extract_lra_release(self, data_dir):
+        if os.path.exists(Path(data_dir) / "lra_release" / "lra_release.gz"):
+            print("Zip already downloaded. Skipping download.")
+            return
+        
+        local_filename = os.path.join(data_dir, "lra_release.gz")
+
         # Extract the tar.gz file
         with tarfile.open(local_filename, "r:gz") as tar:
             for member in tqdm(tar.getmembers(), desc='Extracting'):
@@ -151,6 +159,7 @@ class PathfinderDataModule(pl.LightningDataModule):
 
         # Optionally, remove the tar.gz file after extraction
         os.remove(local_filename)
+
 
     def setup(self, stage=None):
         self._set_transform()
