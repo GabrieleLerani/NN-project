@@ -14,6 +14,7 @@ from omegaconf import OmegaConf
 class ImageDataModule(pl.LightningDataModule):
     """
     Image Classification Dataset from LRA benchmarks, exploiting Cifar10 dataset (1D or 2D)
+    Image (Cifar black & white)
     """
 
     def __init__(
