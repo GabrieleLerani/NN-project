@@ -19,6 +19,7 @@ load_model:
   pre_trained: True
   epoch: 0
   step: 0
+  model: "last"
 
 
 train:

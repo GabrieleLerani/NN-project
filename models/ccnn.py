@@ -54,10 +54,23 @@ class CCNN(pl.LightningModule):
         self.blocks = []
         for _ in range(self.no_blocks):
             if cfg.net.block_type == "s4":
-                s4 = S4Block(in_channels=hidden_channels, out_channels=hidden_channels, data_dim=data_dim, net_cfg=cfg.net, kernel_cfg=cfg.kernel)
+                s4 = S4Block(
+                    in_channels=hidden_channels, 
+                    out_channels=hidden_channels, 
+                    data_dim=data_dim, 
+                    net_cfg=cfg.net, 
+                    kernel_cfg=cfg.kernel, 
+                    dropout=cfg.train.dropout_rate
+                )
                 self.blocks.append(s4)
             elif cfg.net.block_type == "tcn":
-                tcn = TCNBlock(in_channels=hidden_channels, out_channels=hidden_channels, data_dim=data_dim, net_cfg=cfg.net, kernel_cfg=cfg.kernel)
+                tcn = TCNBlock(
+                    in_channels=hidden_channels, 
+                    out_channels=hidden_channels, 
+                    data_dim=data_dim, net_cfg=cfg.net, 
+                    kernel_cfg=cfg.kernel, 
+                    dropout=cfg.train.dropout_rate
+                )
                 self.blocks.append(tcn)
         
         
@@ -76,6 +89,10 @@ class CCNN(pl.LightningModule):
             self.global_avg_pool_layer,
             self.pointwise_linear_layer
         )
+
+        # init last layer
+        torch.nn.init.kaiming_normal_(self.pointwise_linear_layer.layer.weight)
+        self.pointwise_linear_layer.layer.bias.data.fill_(value=0.0)
 
         # define metrics
         self.accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=out_channels)

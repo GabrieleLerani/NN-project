@@ -32,7 +32,8 @@ class S4Block(nn.Module):
             out_channels,
             data_dim,
             net_cfg: OmegaConf,
-            kernel_cfg: OmegaConf, 
+            kernel_cfg: OmegaConf,
+            dropout: float 
         ):
         """
         Method to init the S4 block
@@ -51,7 +52,7 @@ class S4Block(nn.Module):
         
         self.gelu_layer = [nn.GELU(), nn.GELU()]
 
-        self.dropout_layer = GetDropout(data_dim=data_dim)
+        self.dropout_layer = GetDropout(data_dim=data_dim, dropout=dropout)
 
         # pointwise linear convolutional layer
         self.pointwise_linear_layer = LinearLayer(data_dim, in_channels, out_channels)
@@ -65,6 +66,10 @@ class S4Block(nn.Module):
             self.gelu_layer[1]
         )
 
+        # init last linear layer
+        nn.init.kaiming_normal_(self.pointwise_linear_layer.layer.weight)
+        self.pointwise_linear_layer.layer.bias.data.fill_(0.0)
+        
         # Used in residual networks (ResNets) to add a direct path from the input to the output, 
         # which helps in training deeper networks by mitigating the vanishing gradient problem.
         shortcut = []
