@@ -14,7 +14,13 @@ class STL10DataModule(pl.LightningDataModule):
         self.data_dir = data_dir
         self.cfg = cfg
         self.num_workers = 0 # for google colab training
-        self.transform = transforms.ToTensor()
+        self.transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean = (0.44671097, 0.4398105, 0.4066468),
+                    std = (0.2603405, 0.25657743, 0.27126738)
+                )
+        ])
         self._yaml_parameters()
 
     def prepare_data(self):

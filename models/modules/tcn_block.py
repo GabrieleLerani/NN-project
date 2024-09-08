@@ -36,6 +36,7 @@ class TCNBlock(nn.Module):
             data_dim,
             net_cfg: OmegaConf,
             kernel_cfg: OmegaConf, 
+            dropout: float 
         ):
         """
         Method to init the S4 block
@@ -67,7 +68,7 @@ class TCNBlock(nn.Module):
         
         self.gelu_layer = [nn.GELU(), nn.GELU()]
 
-        self.dropout_layer = [GetDropout(data_dim=data_dim),GetDropout(data_dim=data_dim)]
+        self.dropout_layer = [GetDropout(data_dim=data_dim, dropout=dropout),GetDropout(data_dim=data_dim,dropout=dropout)]
 
         self.seq_modules = nn.Sequential(
             
