@@ -27,7 +27,11 @@ class Cifar10DataModule(pl.LightningDataModule):
     def _set_transform(self):
 
         self.transform = transforms.Compose([
-                transforms.ToTensor()
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean = (0.49139968, 0.48215841, 0.44653091),
+                    std = (0.24703223, 0.24348513, 0.26158784)
+                )
         ])
 
         if self.type == "scifar10":

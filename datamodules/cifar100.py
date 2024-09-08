@@ -15,7 +15,13 @@ class Cifar100DataModule(pl.LightningDataModule):
         self.type = cfg.data.dataset
         self.cfg = cfg
         self.num_workers = 0 # for google colab training
-        self.transform = transforms.ToTensor()
+        self.transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean = (0.50707516, 0.48654887, 0.44091784),
+                    std = (0.26733429, 0.25643846, 0.27615047)
+                )
+        ])
         self._yaml_parameters()
 
 
