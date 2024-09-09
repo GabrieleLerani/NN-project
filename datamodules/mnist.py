@@ -6,6 +6,7 @@ import torch
 import matplotlib.pyplot as plt
 from omegaconf import OmegaConf
 from typing import Tuple
+import numpy as np
 
 class MnistDataModule(L.LightningDataModule):
     def __init__(self, cfg, data_dir: str = "datasets"):
@@ -32,10 +33,10 @@ class MnistDataModule(L.LightningDataModule):
             ]
         )
 
-        if self.type == "pmnist":
-            self.transform.transforms.append(
-                transforms.Lambda(lambda x: x[: ,torch.randperm(784)])
-            )  # permutation of the 784 pixels of the width dimension
+    
+        if self.type == "pmnist":        
+            self.permutation = torch.randperm(784)
+
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
 
@@ -158,9 +159,16 @@ class MnistDataModule(L.LightningDataModule):
             shuffle=False,
         )
 
-    def teardown(self, stage: str):
-        # Used to clean-up when the run is finished
-        ...
+    def on_before_batch_transfer(self, batch, dataloader_idx: int):
+        if self.type == "pmnist":
+            # apply permutation 
+            x, y = batch
+            if x.device != self.permutation.device: # Check if devices match
+                self.permutation = self.permutation.to(x.device) # Move permutation to the same device as x
+            x = x[:, :, self.permutation]
+            batch = x, y
+        return batch
+
 
     def show_samples(self, num_samples: int = 5):
         dataset = self.mnist_full

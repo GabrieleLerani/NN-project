@@ -68,7 +68,7 @@ class TCNBlock(nn.Module):
         
         self.gelu_layer = [nn.GELU(), nn.GELU()]
 
-        self.dropout_layer = [GetDropout(data_dim=data_dim, dropout=dropout),GetDropout(data_dim=data_dim,dropout=dropout)]
+        self.dropout_layer = [GetDropout(data_dim=data_dim, p=dropout),GetDropout(data_dim=data_dim,p=dropout)]
 
         self.seq_modules = nn.Sequential(
             
