@@ -78,13 +78,11 @@ class PathfinderDataModule(pl.LightningDataModule):
     def __init__(
         self,
         cfg,
-        data_dir: str = "datasets",
-        resolution="32",
-        level="hard",
-        val_split=0.1,
-        test_split=0.1,
+        data_dir: str = "data/datasets",
     ):
         super().__init__()
+
+        level = "hard"
 
         level_dir = {
             "easy": "curv_baseline",
@@ -97,11 +95,11 @@ class PathfinderDataModule(pl.LightningDataModule):
         self.type = cfg.data.type
         self.cfg = cfg
 
-        self.resolution = resolution
+        self.resolution = "32"
         self.level = level
 
-        self.val_split = val_split
-        self.test_split = test_split
+        self.val_split = 0.1
+        self.test_split = 0.1
 
         self.num_workers = 7
 
@@ -180,6 +178,10 @@ class PathfinderDataModule(pl.LightningDataModule):
                 transforms.ToTensor(),
             ]
         )
+        if self.type == "sequence":
+            self.transform.transforms.append(
+                transforms.Lambda(lambda x: x.view(-1))
+            )  # flatten the image
 
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
@@ -241,14 +243,6 @@ class PathfinderDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
         )
         return test_dataloader
-
-    def on_before_batch_transfer(self, batch, dataloader_idx):
-        if self.data_type == "sequence":
-            x, y = batch
-            x_shape = x.shape
-            x = x.view(x_shape[0], x_shape[1], -1)
-            batch = x, y
-        return batch
 
 
 if __name__ == "__main__":
