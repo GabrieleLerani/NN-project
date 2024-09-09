@@ -78,7 +78,7 @@ class PathfinderDataModule(pl.LightningDataModule):
     def __init__(
         self,
         cfg,
-        data_dir: str = "data/datasets",
+        data_dir: str = "datasets",
     ):
         super().__init__()
 
@@ -110,14 +110,15 @@ class PathfinderDataModule(pl.LightningDataModule):
             # Create data directory if it doesn't exist
             os.makedirs(self.data_dir, exist_ok=True)
 
-            if not os.path.exists(
-                Path(self.data_dir) / "lra_release" / "lra_release.gz"
-            ):
-                self.download_lra_release(self.data_dir)
-            else:
-                print("Zip already downloaded. Skipping download.")
+        if not os.path.exists(
+            Path(self.data_dir) / "lra_release" / "lra_release.gz"
+        ):
+            self.download_lra_release(self.data_dir)
+        else:
+            print("Zip already downloaded. Skipping download.")
 
-            self.extract_lra_release(self.data_dir)
+        self.extract_lra_release(self.data_dir)
+        
 
     def download_lra_release(self, data_dir):
         url = "https://storage.googleapis.com/long-range-arena/lra_release.gz"
@@ -137,6 +138,7 @@ class PathfinderDataModule(pl.LightningDataModule):
                 for chunk in r.iter_content(chunk_size=8192):
                     size = f.write(chunk)
                     bar.update(size)
+
 
     def extract_lra_release(self, data_dir):
         local_filename = os.path.join(data_dir, "lra_release.gz")
