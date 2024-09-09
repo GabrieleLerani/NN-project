@@ -22,7 +22,6 @@ class Cifar10DataModule(pl.LightningDataModule):
         CIFAR10(self.data_dir, train=True, download=True)
         CIFAR10(self.data_dir, train=False, download=True)
 
-        
 
     def _set_transform(self):
 
@@ -34,7 +33,7 @@ class Cifar10DataModule(pl.LightningDataModule):
                 )
         ])
 
-        if self.type == "scifar10":
+        if self.type == "s_cifar10":
             self.transform.transforms.append(transforms.Lambda(lambda x: x.view(-1))) # flatten the image to 1024 pixels
 
 
@@ -54,7 +53,7 @@ class Cifar10DataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.weight_decay", 0.0001)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 1435.77)
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
-            elif self.type == "scifar10":
+            elif self.type == "s_cifar10":
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.0)
                 OmegaConf.update(self.cfg, "train.weight_decay", 0)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2386.49)
@@ -67,7 +66,7 @@ class Cifar10DataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.15)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 1435.77)
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
-            elif self.type == "scifar10":
+            elif self.type == "s_cifar10":
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.25)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 4005.15)
@@ -77,7 +76,6 @@ class Cifar10DataModule(pl.LightningDataModule):
     def setup(self, stage: str):
         self._set_transform()
         
-
         self.batch_size = self.cfg.train.batch_size
 
         # Assign train/val datasets for use in dataloaders
@@ -125,7 +123,6 @@ class Cifar10DataModule(pl.LightningDataModule):
         print(f"Training set size: {len(train)}")
         print(f"Validation set size: {len(val)}")
         return train, val
-        
 
 
     def train_dataloader(self):

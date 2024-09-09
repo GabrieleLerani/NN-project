@@ -19,7 +19,7 @@ class SpeechCommandsDataModule(L.LightningDataModule):
     def __init__(
         self,
         cfg,
-        data_dir: str = "data/datasets",
+        data_dir: str = "datasets",
     ):
 
         super().__init__()
@@ -41,7 +41,7 @@ class SpeechCommandsDataModule(L.LightningDataModule):
             self.data_dir, "SpeechCommands/speech_commands_v0.02"
         )
 
-        assert self.type in ["sc_raw", "sc_mfcc"]
+        assert self.type in ["speech_raw", "speech_mfcc"]
         self.cfg = cfg
 
         self._yaml_parameters()
@@ -54,12 +54,12 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
 
         # 140 and 380 hidden_channels have same parameters
-        if self.type == "sc_raw":
+        if self.type == "speech_raw":
             OmegaConf.update(self.cfg, "net.in_channels", 1)
             OmegaConf.update(self.cfg, "train.batch_size", 20)
             OmegaConf.update(self.cfg, "train.epochs", 160)
             OmegaConf.update(self.cfg, "kernel.omega_0", 1295.61)
-        elif self.type == "sc_mfcc":
+        elif self.type == "speech_mfcc":
             OmegaConf.update(self.cfg, "net.in_channels", 20)
             OmegaConf.update(self.cfg, "train.batch_size", 100)
             OmegaConf.update(self.cfg, "train.epochs", 110)

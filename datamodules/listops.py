@@ -13,15 +13,15 @@ from nltk.tokenize import WhitespaceTokenizer, word_tokenize
 import re
 import numpy as np
 import torch.nn as nn
+from tqdm import tqdm
 
 nltk.download("punkt_tab")
-
 
 from torchvision import transforms
 
 
 class ListOpsDataModule(pl.LightningDataModule):
-    def __init__(self, cfg, data_dir: str = "data/datasets"):
+    def __init__(self, cfg, data_dir: str = "datasets"):
         super().__init__()
         self.data_dir = Path(data_dir)
         self.num_workers = 7
@@ -32,8 +32,6 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.max_length = 5
         self.special_tokens = ["<unk>", "<bos>", "<eos>"]
 
-        # Determine data_type
-        self.type = cfg.data.type
         self.cfg = cfg
 
         self._yaml_parameters()
@@ -50,45 +48,48 @@ class ListOpsDataModule(pl.LightningDataModule):
         OmegaConf.update(self.cfg, "net.out_channels", 10)
         OmegaConf.update(self.cfg, "train.learning_rate", 0.001)
         OmegaConf.update(self.cfg, "kernel.omega_0", 784.66)
+        OmegaConf.update(self.cfg, "net.data_dim", 1)
 
         if hidden_channels == 140:
             OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
-            OmegaConf.update(self.cfg, "net.data_dim", 1)
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
-            OmegaConf.update(self.cfg, "kernel.omega_0", 2272.56)
-        elif hidden_channels == 380:
 
-            OmegaConf.update(self.cfg, "net.data_dim", 1)
+        elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.25)
-            OmegaConf.update(self.cfg, "kernel.omega_0", 2272.56)
 
-    def _download_and_extract_lra_release(self):
 
-        if os.path.exists(Path(self.data_dir) / "lra_release"):
-            print(
-                f"Directory {self.data_dir} already exists. Skipping download and extraction."
-            )
-            return
+    def _download_lra_release(self):
         url = "https://storage.googleapis.com/long-range-arena/lra_release.gz"
         local_filename = os.path.join(self.data_dir, "lra_release.gz")
 
-        # Create data directory if it doesn't exist
-        os.makedirs(self.data_dir, exist_ok=True)
-
         # Download the file
         with requests.get(url, stream=True) as r:
+            total = int(r.headers.get("content-length", 0))
             r.raise_for_status()
-            with open(local_filename, "wb") as f:
+            with open(local_filename, "wb") as f, tqdm(
+                desc=local_filename,
+                total=total,
+                unit="iB",
+                unit_scale=True,
+                unit_divisor=1024,
+            ) as bar:
                 for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
+                    size = f.write(chunk)
+                    bar.update(size)
+
+
+    def _extract_lra_release(self):
+        local_filename = os.path.join(self.data_dir, "lra_release.gz")
 
         # Extract the tar.gz file
         with tarfile.open(local_filename, "r:gz") as tar:
-            tar.extractall(path=self.data_dir)
+            for member in tqdm(tar.getmembers(), desc="Extracting"):
+                tar.extract(member)
 
         # Optionally, remove the tar.gz file after extraction
         os.remove(local_filename)
+
 
     def _loading_pipeline(self):
         """
@@ -114,7 +115,6 @@ class ListOpsDataModule(pl.LightningDataModule):
         6. Padding adn Batching
         length = 5 --> [3,4,5,6,0]
         batch_size = 1 --> batch 1 --> {[3,4,5,6,0]}
-
         """
 
         # loading the datasets from tsv files
@@ -188,10 +188,22 @@ class ListOpsDataModule(pl.LightningDataModule):
         print(f"Saving dataset to {self.serialized_dataset_path}...")
         self.dataset.save_to_disk(self.serialized_dataset_path)
 
+
     def prepare_data(self):
-        # download the dataset if not already done
-        if not self.data_dir.is_dir():
-            self._download_and_extract_lra_release(self.data_dir)
+        if not self.cfg.data.light_lra:
+            if not self.data_dir.is_dir():
+                # Create data directory if it doesn't exist
+                os.makedirs(self.data_dir, exist_ok=True)
+
+            if not os.path.exists(
+                Path(self.data_dir) / "lra_release" / "lra_release.gz"
+            ):
+                self._download_lra_release(self.data_dir)
+            else:
+                print("Zip already downloaded. Skipping download.")
+
+            self._extract_lra_release(self.data_dir)
+        
 
     def setup(self, stage):
 

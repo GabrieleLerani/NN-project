@@ -17,8 +17,6 @@ kernel:
 
 load_model:
   pre_trained: True
-  epoch: 0
-  step: 0
   model: "last"
 
 
@@ -49,7 +47,8 @@ data:
   dataset : "sc_mfcc"
   type: "default"
   reduced_dataset: False
-  
+  # this line is used only in datamodules that uses LRA as dataset (pathfinder, listops, etc.)
+  light_lra: False
 
 # Comment the two sections below to make hydra generate the files again
 defaults:  
