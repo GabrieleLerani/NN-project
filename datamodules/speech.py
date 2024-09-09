@@ -6,99 +6,71 @@ from .utils import split_data, load_data_from_partition, save_data, normalise_da
 import torch
 import os
 from tqdm import tqdm
+from torch.utils.data import random_split
+
 from omegaconf import OmegaConf
+from datasets import load_dataset, DatasetDict, Dataset
 
-class SpeechCommandsModule(L.LightningDataModule):
-    def __init__(self, cfg, data_dir : str = "datasets"):
+from pathlib import Path
+from torchvision import transforms
+
+
+class SpeechCommandsDataModule(L.LightningDataModule):
+
+    def __init__(
+        self,
+        cfg,
+        data_dir: str = "data/datasets",
+    ):
+
         super().__init__()
-        self.data_dir = data_dir
-        self.type = cfg.data.dataset
-        self.data_processed_location = self.data_dir + "/SpeechCommands/processed_data/" + self.type
-        self.download_location = self.data_dir + "/SpeechCommands/speech_commands_v0.02"
-        self.cfg = cfg
-        self.num_workers = 0 # for google colab training
-        self._yaml_parameters()
 
-    def process_data(self):
-        x = torch.empty(34975, 16000, 1)
-        y = torch.empty(34975, dtype=torch.long)
-
-        batch_index = 0
-        y_index = 0
-        for foldername in (
-            "yes",
-            "no",
-            "up",
-            "down",
-            "left",
-            "right",
-            "on",
-            "off",
-            "stop",
-            "go",
-        ):
-            loc = self.download_location + "/" + foldername
-            for filename in tqdm(os.listdir(loc)):
-                audio, _ = torchaudio.load(
-                    loc + "/" + filename,
-                    channels_first=False,
-                )
-
-                # A few samples are shorter than the full length; for simplicity we discard them.
-                if len(audio) != 16000:
-                    continue
-
-                x[batch_index] = audio
-                y[batch_index] = y_index
-                batch_index += 1
-            y_index += 1
-
-        # If MFCC, then we compute these coefficients.
-        if self.type == "sc_mfcc":
-            x = torchaudio.transforms.MFCC(
-                log_mels=True, n_mfcc=20, melkwargs=dict(n_fft=200, n_mels=64)
-            )(x.squeeze(-1)).detach()
-            # X is of shape (batch=34975, channels=20, length=161)
-        else:
-            x = x.unsqueeze(1).squeeze(-1)
-            # X is of shape (batch=34975, channels=1, length=16000)
-
-        # Normalize data
-        if self.type == "sc_mfcc":
-            x = normalise_data(x.transpose(1, 2), y).transpose(1, 2)
-        else:
-            x = normalise_data(x, y)
-
-        train_x, val_x, test_x = split_data(x, y)
-        train_y, val_y, test_y = split_data(y, y)
-        
-        return (
-            train_x,
-            val_x,
-            test_x,
-            train_y,
-            val_y,
-            test_y,
+        # Save parameters to self
+        self.data_dir = Path(data_dir) / "SPEECH"
+        self.num_workers = 7
+        self.batch_size = cfg.train.batch_size
+        self.serialized_dataset_path = os.path.join(
+            self.data_dir, "preprocessed_dataset_img_lra"
         )
 
+        self.val_split = 0.1
+        self.train_split = 0.9
 
-    def prepare_data(self):
-        # download
-        SPEECHCOMMANDS(self.data_dir, download=True)
-        if not os.path.exists(self.data_processed_location + "/train_x.pt"):
-            train_x, val_x, test_x, train_y, val_y, test_y = self.process_data()
+        # Determine data_type
+        self.type = cfg.data.type
 
-            save_data(
-                self.data_processed_location,
-                train_x=train_x,
-                val_x=val_x,
-                test_x=test_x,
-                train_y=train_y,
-                val_y=val_y,
-                test_y=test_y,
+        assert self.type in ["sc_raw", "sc_mfcc"]
+        self.cfg = cfg
+
+        self._yaml_parameters()
+
+    def _set_transform(self):
+
+        if self.type == "sc_raw":
+            self.transform = transforms.Compose(
+                [
+                    transforms.Lambda(
+                        lambda x: x.unsqueeze(0)
+                    ),  # add channel dimension
+                    transforms.Lambda(
+                        lambda x: x.to(torch.float32)
+                    ),  # convert to float
+                    transforms.Normalize(mean=0.0, std=1.0),  # normalize to [0, 1]
+                ]
+            )
+        elif self.type == "sc_mfcc":
+            self.transform = transforms.Compose(
+                [
+                    torchaudio.transforms.MFCC(
+                        log_mels=True, n_mfcc=20, melkwargs=dict(n_fft=200, n_mels=64)
+                    ),
+                    transforms.Lambda(
+                        lambda x: x.to(torch.float32)
+                    ),  # convert to float
+                    transforms.Normalize(mean=0.0, std=1.0),  # normalize to [0, 1]
+                ]
             )
 
-    
     def _yaml_parameters(self):
         OmegaConf.update(self.cfg, "net.out_channels", 10)
         OmegaConf.update(self.cfg, "net.data_dim", 1)
@@ -118,70 +90,164 @@ class SpeechCommandsModule(L.LightningDataModule):
             OmegaConf.update(self.cfg, "train.epochs", 110)
             OmegaConf.update(self.cfg, "kernel.omega_0", 750.18)
 
+    def _loading_pipeline(self):
+        """
+        1. Loading the dataset with transformations applied
+        2. Split the dataset
+        3. Save the processed dataset
+        """
+        x = torch.empty(34975, 16000, 1)
+        y = torch.empty(34975, dtype=torch.long)
+        batch_index = 0
+        y_index = 0
+        for foldername in (
+            "yes",
+            "no",
+            "up",
+            "down",
+            "left",
+            "right",
+            "on",
+            "off",
+            "stop",
+            "go",
+        ):
+            loc = os.path.join(self.data_dir, foldername)
+            for filename in tqdm(os.listdir(loc)):
+                audio, _ = torchaudio.load(
+                    os.path.join(loc, filename),
+                    channels_first=False,
+                )
+
+                # Discard samples shorter than 1 second
+                if len(audio) != 16000:
+                    continue
+
+                transformed_audio = self.transform(audio)
+                x[batch_index] = transformed_audio
+                y[batch_index] = y_index
+                batch_index += 1
+            y_index += 1
+
+        # Split data into train, validation, and test sets
+        total_size = len(y)
+        train_size = int(self.train_split * total_size)  # 80% for training
+        val_size = int(self.val_split * total_size)  # 10% for validation
+        test_size = total_size - train_size - val_size  # Remaining 10% for testing
+
+        train_data, val_data, test_data = random_split(
+            list(zip(x, y)), [train_size, val_size, test_size]
+        )
+
+        # Convert splits to Hugging Face datasets
+        self.dataset = DatasetDict(
+            {
+                "train": Dataset.from_dict(
+                    {
+                        "audio": [
+                            d[0].tolist() for d in train_data
+                        ],  # Convert tensors to lists
+                        "label": [
+                            d[1].item() for d in train_data
+                        ],  # Convert tensors to scalars
+                    }
+                ),
+                "val": Dataset.from_dict(
+                    {
+                        "audio": [d[0].tolist() for d in val_data],
+                        "label": [d[1].item() for d in val_data],
+                    }
+                ),
+                "test": Dataset.from_dict(
+                    {
+                        "audio": [d[0].tolist() for d in test_data],
+                        "label": [d[1].item() for d in test_data],
+                    }
+                ),
+            }
+        )
+
+        # Save to disk
+        self.dataset.save_to_disk(self.serialized_dataset_path)
+
+    def prepare_data(self):
+        if not self.data_dir.is_dir():
+            SPEECHCOMMANDS(self.data_dir, download=True)
 
     def setup(self, stage: str):
-        
 
-        self.batch_size = self.cfg.train.batch_size
+        self._set_transform()
 
+        # if already done load the preprocessed dataset
+        if os.path.exists(self.serialized_dataset_path):
+            print(f"Loading dataset from {self.serialized_dataset_path}...")
+            self.dataset = DatasetDict.load_from_disk(self.serialized_dataset_path)
+        else:
+            # pipeline to load data
+            self._loading_pipeline()
+
+        # assign train/val datasets for use in dataloaders
         if stage == "fit":
-            # train
-            x_train, y_train = load_data_from_partition(
-                self.data_processed_location, partition="train"
-            )
-            self.train_dataset = TensorDataset(x_train, y_train)
-            # validation
-            x_val, y_val = load_data_from_partition(
-                self.data_processed_location, partition="val"
-            )
-            self.val_dataset = TensorDataset(x_val, y_val)
-        if stage == "test":
-            # test
-            x_test, y_test = load_data_from_partition(
-                self.data_processed_location, partition="test"
-            )
-            self.test_dataset = TensorDataset(x_test, y_test)
-        if stage == "predict":
-            # predict
-            x_test, y_test = load_data_from_partition(
-                self.data_processed_location, partition="test"
-            )
-            self.test_dataset = TensorDataset(x_test, y_test)
 
+            self.train_dataset, self.val_dataset = (
+                self.dataset["train"],
+                self.dataset["val"],
+            )
+
+        if stage == "test":
+            self.test_dataset = self.dataset["test"]
+
+        if stage == "predict":
+            self.test_dataset = self.dataset["test"]
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset,
-                          batch_size=self.batch_size,
-                          num_workers=self.num_workers,
-                          shuffle=False)
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+        )
 
     def val_dataloader(self):
-        return DataLoader(self.val_dataset,
-                          batch_size=self.batch_size,
-                          num_workers=self.num_workers,
-                          shuffle=False)
-    
-    def test_dataloader(self):
-        return DataLoader(self.test_dataset,
-                          batch_size=self.batch_size,
-                          num_workers=self.num_workers,
-                          shuffle=False)
-    
-    def predict_dataloader(self):
-        return DataLoader(self.test_dataset,
-                          batch_size=self.batch_size,
-                          num_workers=self.num_workers,
-                          shuffle=False)
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+        )
 
-    def teardown(self, stage: str):
-        # Used to clean-up when the run is finished
-        ...
+    def test_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+        )
+
+    def predict_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+        )
 
 
 if __name__ == "__main__":
-    cfg = OmegaConf.load("config/config.yaml")
-    sc = SpeechCommandsModule(cfg)
 
-    sc.prepare_data()
-    sc.setup("fit")
-    sc.setup("test")
+    cfg = OmegaConf.load("config/config.yaml")
+
+    dm = SpeechCommandsDataModule(
+        cfg=cfg,
+        data_dir="data/datasets",
+    )
+    dm.prepare_data()
+    dm.setup(stage="fit")
+    train_loader = dm.train_dataloader()
+
+    for images, labels in train_loader:
+        print(f"Batch of images shape: {images.shape}")
+        print(f"Batch of labels: {labels}")
+        print(f"First image tensor: {images[0]}")
+        print(f"First label: {labels[0]}")
+        break

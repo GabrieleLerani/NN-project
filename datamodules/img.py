@@ -113,8 +113,6 @@ class ImageDataModule(pl.LightningDataModule):
     def setup(self, stage: str):
         self._set_transform()
 
-        self.batch_size = self.cfg.train.batch_size
-
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
             self.train_dataset, self.val_dataset = self._get_train_dataset()
