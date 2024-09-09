@@ -2,12 +2,11 @@ import pytorch_lightning as L
 import torchaudio
 from torchaudio.datasets import SPEECHCOMMANDS
 from torch.utils.data import DataLoader, TensorDataset
-from .utils import split_data, load_data_from_partition, save_data, normalise_data
 import torch
 import os
 from tqdm import tqdm
 from torch.utils.data import random_split
-
+from utils import normalise_data
 from omegaconf import OmegaConf
 from datasets import load_dataset, DatasetDict, Dataset
 
@@ -30,46 +29,22 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         self.num_workers = 7
         self.batch_size = cfg.train.batch_size
         self.serialized_dataset_path = os.path.join(
-            self.data_dir, "preprocessed_dataset_img_lra"
+            self.data_dir, "preprocessed_dataset_speech"
         )
 
         self.val_split = 0.1
         self.train_split = 0.9
 
         # Determine data_type
-        self.type = cfg.data.type
+        self.type = cfg.data.dataset
+        self.speech_dir = os.path.join(
+            self.data_dir, "SpeechCommands/speech_commands_v0.02"
+        )
 
         assert self.type in ["sc_raw", "sc_mfcc"]
         self.cfg = cfg
 
         self._yaml_parameters()
-
-    def _set_transform(self):
-
-        if self.type == "sc_raw":
-            self.transform = transforms.Compose(
-                [
-                    transforms.Lambda(
-                        lambda x: x.unsqueeze(0)
-                    ),  # add channel dimension
-                    transforms.Lambda(
-                        lambda x: x.to(torch.float32)
-                    ),  # convert to float
-                    transforms.Normalize(mean=0.0, std=1.0),  # normalize to [0, 1]
-                ]
-            )
-        elif self.type == "sc_mfcc":
-            self.transform = transforms.Compose(
-                [
-                    torchaudio.transforms.MFCC(
-                        log_mels=True, n_mfcc=20, melkwargs=dict(n_fft=200, n_mels=64)
-                    ),
-                    transforms.Lambda(
-                        lambda x: x.to(torch.float32)
-                    ),  # convert to float
-                    transforms.Normalize(mean=0.0, std=1.0),  # normalize to [0, 1]
-                ]
-            )
 
     def _yaml_parameters(self):
         OmegaConf.update(self.cfg, "net.out_channels", 10)
@@ -96,8 +71,9 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         2. Split the dataset
         3. Save the processed dataset
         """
-        x = torch.empty(34975, 16000, 1)
-        y = torch.empty(34975, dtype=torch.long)
+        ###################################################
+        X = torch.empty(34975, 16000, 1)
+        Y = torch.empty(34975, dtype=torch.long)
         batch_index = 0
         y_index = 0
         for foldername in (
@@ -112,71 +88,67 @@ class SpeechCommandsDataModule(L.LightningDataModule):
             "stop",
             "go",
         ):
-            loc = os.path.join(self.data_dir, foldername)
+            loc = os.path.join(self.speech_dir, foldername)
             for filename in tqdm(os.listdir(loc)):
                 audio, _ = torchaudio.load(
                     os.path.join(loc, filename),
                     channels_first=False,
                 )
 
+                audio = audio / 2**15
+
                 # Discard samples shorter than 1 second
                 if len(audio) != 16000:
                     continue
-
-                transformed_audio = self.transform(audio)
-                x[batch_index] = transformed_audio
-                y[batch_index] = y_index
+                X[batch_index] = audio
+                Y[batch_index] = y_index
                 batch_index += 1
             y_index += 1
 
+        if self.type == "sc_mfcc":
+            X = torchaudio.transforms.MFCC(
+                log_mels=True, n_mfcc=20, melkwargs=dict(n_fft=200, n_mels=64)
+            )(X.squeeze(-1)).detach()
+            X = normalise_data(X.transpose(1, 2), Y).transpose(1, 2)
+
+        elif self.type == "sc_raw":
+            X = X.unsqueeze(1).squeeze(-1)
+            X = normalise_data(X, Y)
+        ###################################################
         # Split data into train, validation, and test sets
-        total_size = len(y)
+        total_size = len(Y)
         train_size = int(self.train_split * total_size)  # 80% for training
         val_size = int(self.val_split * total_size)  # 10% for validation
         test_size = total_size - train_size - val_size  # Remaining 10% for testing
 
         train_data, val_data, test_data = random_split(
-            list(zip(x, y)), [train_size, val_size, test_size]
+            list(zip(X, Y)), [train_size, val_size, test_size]
         )
 
         # Convert splits to Hugging Face datasets
         self.dataset = DatasetDict(
             {
-                "train": Dataset.from_dict(
-                    {
-                        "audio": [
-                            d[0].tolist() for d in train_data
-                        ],  # Convert tensors to lists
-                        "label": [
-                            d[1].item() for d in train_data
-                        ],  # Convert tensors to scalars
-                    }
-                ),
-                "val": Dataset.from_dict(
-                    {
-                        "audio": [d[0].tolist() for d in val_data],
-                        "label": [d[1].item() for d in val_data],
-                    }
-                ),
-                "test": Dataset.from_dict(
-                    {
-                        "audio": [d[0].tolist() for d in test_data],
-                        "label": [d[1].item() for d in test_data],
-                    }
-                ),
+                "train": train_data,
+                "val": val_data,
+                "test": test_data,
             }
         )
 
-        # Save to disk
-        self.dataset.save_to_disk(self.serialized_dataset_path)
+        # TODO Save to disk
+        # self.dataset.save_to_disk(self.serialized_dataset_path)
 
     def prepare_data(self):
         if not self.data_dir.is_dir():
-            SPEECHCOMMANDS(self.data_dir, download=True)
+            print(f"Creating directory at {self.data_dir}")
+            os.makedirs(self.data_dir, exist_ok=True)
+            print(f"Directory created: {os.path.isdir(self.data_dir)}")
+
+            try:
+                self.data = SPEECHCOMMANDS(self.data_dir, download=True)
+            except Exception as e:
+                print(f"Error initializing SPEECHCOMMANDS: {e}")
 
     def setup(self, stage: str):
-
-        self._set_transform()
 
         # if already done load the preprocessed dataset
         if os.path.exists(self.serialized_dataset_path):
@@ -239,7 +211,6 @@ if __name__ == "__main__":
 
     dm = SpeechCommandsDataModule(
         cfg=cfg,
-        data_dir="data/datasets",
     )
     dm.prepare_data()
     dm.setup(stage="fit")

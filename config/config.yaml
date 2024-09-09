@@ -46,7 +46,7 @@ test:
 
 data:
   data_dir : "datasets"
-  dataset : "sc_raw"
+  dataset : "sc_mfcc"
   type: "default"
   reduced_dataset: False
   
