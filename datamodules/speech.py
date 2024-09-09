@@ -95,7 +95,7 @@ class SpeechCommandsDataModule(L.LightningDataModule):
                     channels_first=False,
                 )
 
-                audio = audio / 2**15
+                audio = audio / 2**15  # normalization to have values in [0,1]
 
                 # Discard samples shorter than 1 second
                 if len(audio) != 16000:
@@ -105,13 +105,21 @@ class SpeechCommandsDataModule(L.LightningDataModule):
                 batch_index += 1
             y_index += 1
 
+        # X shape (34975, 16000, 1)
+
         if self.type == "sc_mfcc":
+            # afetr squeeze shape of X is (34975, 16000) and then mfcc becomes (34975,20,time_frames)
+            # where time_frames depends on the audio length and the parameters used (like n_fft and hop_length).
             X = torchaudio.transforms.MFCC(
                 log_mels=True, n_mfcc=20, melkwargs=dict(n_fft=200, n_mels=64)
             )(X.squeeze(-1)).detach()
-            X = normalise_data(X.transpose(1, 2), Y).transpose(1, 2)
+            X = normalise_data(X.transpose(1, 2), Y).transpose(
+                1, 2
+            )  # transpose normalization and transpose back
 
         elif self.type == "sc_raw":
+            # remove last dim and add the channle dim
+            # the shape of X is (34975, 1, 16000)
             X = X.unsqueeze(1).squeeze(-1)
             X = normalise_data(X, Y)
         ###################################################
