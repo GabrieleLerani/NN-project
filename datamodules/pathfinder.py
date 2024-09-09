@@ -82,7 +82,14 @@ class PathfinderDataModule(pl.LightningDataModule):
     ):
         super().__init__()
 
-        level = "hard"
+        level = "easy"
+        resolution = "32"
+
+        # if the light version (preprocessed by us) is used, 
+        # then level = easy and resolution = 32
+        if cfg.data.light_lra:
+            level = "easy"
+            resolution = "32"
 
         level_dir = {
             "easy": "curv_baseline",
@@ -95,9 +102,6 @@ class PathfinderDataModule(pl.LightningDataModule):
         self.type = cfg.data.dataset
         self.cfg = cfg
 
-        self.resolution = "32"
-        self.level = level
-
         self.val_split = 0.1
         self.test_split = 0.1
 
@@ -106,18 +110,20 @@ class PathfinderDataModule(pl.LightningDataModule):
         self._yaml_parameters()
 
     def prepare_data(self):
-        if not self.data_dir.is_dir():
-            # Create data directory if it doesn't exist
-            os.makedirs(self.data_dir, exist_ok=True)
+        # download and extract only if the light lra version is not used
+        if not self.cfg.data.light_lra:
+            if not self.data_dir.is_dir():
+                # Create data directory if it doesn't exist
+                os.makedirs(self.data_dir, exist_ok=True)
 
-        if not os.path.exists(
-            Path(self.data_dir) / "lra_release" / "lra_release.gz"
-        ):
-            self.download_lra_release(self.data_dir)
-        else:
-            print("Zip already downloaded. Skipping download.")
+            if not os.path.exists(
+                Path(self.data_dir) / "lra_release" / "lra_release.gz"
+            ):
+                self.download_lra_release(self.data_dir)
+            else:
+                print("Zip already downloaded. Skipping download.")
 
-        self.extract_lra_release(self.data_dir)
+            self.extract_lra_release(self.data_dir)
 
 
     def download_lra_release(self, data_dir):
@@ -150,6 +156,7 @@ class PathfinderDataModule(pl.LightningDataModule):
 
         # Optionally, remove the tar.gz file after extraction
         os.remove(local_filename)
+
 
     def setup(self, stage=None):
         self._set_transform()

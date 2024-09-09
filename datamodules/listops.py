@@ -190,18 +190,19 @@ class ListOpsDataModule(pl.LightningDataModule):
 
 
     def prepare_data(self):
-        if not self.data_dir.is_dir():
-            # Create data directory if it doesn't exist
-            os.makedirs(self.data_dir, exist_ok=True)
+        if not self.cfg.data.light_lra:
+            if not self.data_dir.is_dir():
+                # Create data directory if it doesn't exist
+                os.makedirs(self.data_dir, exist_ok=True)
 
-        if not os.path.exists(
-            Path(self.data_dir) / "lra_release" / "lra_release.gz"
-        ):
-            self._download_lra_release(self.data_dir)
-        else:
-            print("Zip already downloaded. Skipping download.")
+            if not os.path.exists(
+                Path(self.data_dir) / "lra_release" / "lra_release.gz"
+            ):
+                self._download_lra_release(self.data_dir)
+            else:
+                print("Zip already downloaded. Skipping download.")
 
-        self._extract_lra_release(self.data_dir)
+            self._extract_lra_release(self.data_dir)
         
 
     def setup(self, stage):
