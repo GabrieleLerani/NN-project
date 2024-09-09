@@ -143,6 +143,7 @@ class AnisotropicGaborLayer(nn.Module):
             ]
         )
 
+        # TODO check it
         normal_dist = torch.distributions.normal.Normal(0, 1)
 
         # generate as many mi as data_dim (mi_x, mi_y, ...)

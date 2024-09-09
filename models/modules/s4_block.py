@@ -52,7 +52,7 @@ class S4Block(nn.Module):
         
         self.gelu_layer = [nn.GELU(), nn.GELU()]
 
-        self.dropout_layer = GetDropout(data_dim=data_dim, dropout=dropout)
+        self.dropout_layer = GetDropout(data_dim=data_dim, p=dropout)
 
         # pointwise linear convolutional layer
         self.pointwise_linear_layer = LinearLayer(data_dim, in_channels, out_channels)
