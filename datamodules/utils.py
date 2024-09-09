@@ -5,7 +5,15 @@ import os
 
 def get_data_module(cfg : OmegaConf):
     
-    assert cfg.data.dataset in ["smnist","pmnist","cifar10","scifar10","cifar100","stl10","sc_mfcc","sc_raw","pathfinder","listops","image"], "Dataset not supported"
+    assert cfg.data.dataset in [
+        "s_mnist","p_mnist",
+        "cifar10","s_cifar10","cifar100",
+        "stl10",
+        "speech_mfcc","speech_raw",
+        "pathfinder", "s_pathfinder",
+        "listops",
+        "image", "s_image"
+    ], "Dataset not supported"
     assert not (cfg.data.dataset in ["sc_mfcc","sc_raw","pathfinder","path_x","image"] and cfg.data.reduced_dataset), f"Reduced dataset not supported for {cfg.data.dataset}"
 
     # can be either sequential or permuted mnist

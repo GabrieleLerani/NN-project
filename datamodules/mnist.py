@@ -34,7 +34,7 @@ class MnistDataModule(L.LightningDataModule):
         )
 
     
-        if self.type == "pmnist":        
+        if self.type == "p_mnist":        
             self.permutation = torch.randperm(784)
 
     def _yaml_parameters(self):
@@ -47,12 +47,12 @@ class MnistDataModule(L.LightningDataModule):
         OmegaConf.update(self.cfg, "net.data_dim", 1)
 
         if hidden_channels == 140:
-            if self.type == "smnist":
+            if self.type == "s_mnist":
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
                 OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2976.49)
-            elif self.type == "pmnist":
+            elif self.type == "p_mnist":
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "train.weight_decay", 0)
@@ -60,11 +60,11 @@ class MnistDataModule(L.LightningDataModule):
         elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
 
-            if self.type == "smnist":
+            if self.type == "s_mnist":
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2976.49)
-            elif self.type == "pmnist":
+            elif self.type == "p_mnist":
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2985.63)
@@ -160,7 +160,7 @@ class MnistDataModule(L.LightningDataModule):
         )
 
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
-        if self.type == "pmnist":
+        if self.type == "p_mnist":
             # apply permutation 
             x, y = batch
             if x.device != self.permutation.device: # Check if devices match
@@ -183,7 +183,7 @@ class MnistDataModule(L.LightningDataModule):
 
 
 if __name__ == "__main__":
-    mnist = MnistDataModule("data/datasets", 32)
+    mnist = MnistDataModule("datasets", 32)
 
     mnist.setup("fit")
     mnist.show_samples(3)

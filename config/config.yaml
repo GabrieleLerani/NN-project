@@ -17,8 +17,6 @@ kernel:
 
 load_model:
   pre_trained: True
-  epoch: 0
-  step: 0
   model: "last"
 
 
@@ -46,8 +44,7 @@ test:
 
 data:
   data_dir : "datasets"
-  dataset : "sc_raw"
-  type: "default"
+  dataset : "speech_raw"
   reduced_dataset: False
   
 

@@ -92,7 +92,7 @@ class PathfinderDataModule(pl.LightningDataModule):
 
         data_dir = data_dir + f"/lra_release/pathfinder{resolution}/{level_dir}"
         self.data_dir = Path(data_dir)
-        self.type = cfg.data.type
+        self.type = cfg.data.dataset
         self.cfg = cfg
 
         self.resolution = "32"
@@ -118,7 +118,7 @@ class PathfinderDataModule(pl.LightningDataModule):
             print("Zip already downloaded. Skipping download.")
 
         self.extract_lra_release(self.data_dir)
-        
+
 
     def download_lra_release(self, data_dir):
         url = "https://storage.googleapis.com/long-range-arena/lra_release.gz"
@@ -174,13 +174,13 @@ class PathfinderDataModule(pl.LightningDataModule):
         )
 
     def _set_transform(self):
-
         self.transform = transforms.Compose(
             [
                 transforms.ToTensor(),
             ]
         )
-        if self.type == "sequence":
+
+        if self.type == "s_pathfinder":
             self.transform.transforms.append(
                 transforms.Lambda(lambda x: x.view(-1))
             )  # flatten the image
@@ -197,22 +197,25 @@ class PathfinderDataModule(pl.LightningDataModule):
         if hidden_channels == 140:
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
 
-            if self.type == "default":
+            if self.type == "pathfinder":
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 1239.14)
-            elif self.type == "sequence":
+
+            elif self.type == "s_pathfinder":
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2272.56)
+
         elif hidden_channels == 380:
 
-            if self.type == "default":
+            if self.type == "pathfinder":
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
                 OmegaConf.update(self.cfg, "train.weight_decay", 0)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 3908.32)
-            elif self.type == "sequence":
+
+            elif self.type == "s_pathfinder":
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
@@ -255,7 +258,7 @@ if __name__ == "__main__":
     cfg = OmegaConf.load("config/config.yaml")
     dm = PathfinderDataModule(
         cfg=cfg,
-        data_dir="data/datasets",
+        data_dir="datasets",
     )
     dm.prepare_data()
     dm.setup()

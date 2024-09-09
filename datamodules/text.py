@@ -59,8 +59,6 @@ class TextDataModule(pl.LightningDataModule):
         self.max_length = 4096
         self.val_split = 0.1
 
-        # Determine data_type
-        self.type = cfg.data.type
         self.cfg = cfg
 
         self._yaml_parameters()
@@ -84,16 +82,13 @@ class TextDataModule(pl.LightningDataModule):
         OmegaConf.update(self.cfg, "net.data_dim", 1)
 
         if hidden_channels == 140:
-
             OmegaConf.update(self.cfg, "train.weight_decay", 1e-5)
             OmegaConf.update(self.cfg, "train.learning_rate", 0.001)
-
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
+
         elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
-
             OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
-
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.3)
 
     def prepare_data(self):

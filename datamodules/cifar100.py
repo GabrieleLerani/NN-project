@@ -28,9 +28,7 @@ class Cifar100DataModule(pl.LightningDataModule):
     def prepare_data(self):
         # download
         CIFAR100(self.data_dir, train=True, download=True)
-        CIFAR100(self.data_dir, train=False, download=True)
-
-                
+        CIFAR100(self.data_dir, train=False, download=True)     
         
 
     def _yaml_parameters(self):
@@ -44,29 +42,22 @@ class Cifar100DataModule(pl.LightningDataModule):
         OmegaConf.update(self.cfg, "net.data_dim", 2)
 
         if hidden_channels == 140:
-
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
             OmegaConf.update(self.cfg, "train.weight_decay", 0.0001)
             OmegaConf.update(self.cfg, "kernel.omega_0", 3521.55)
-            
             
         elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
             OmegaConf.update(self.cfg, "kernel.omega_0", 679.14)
             
-            
-
-
 
     def setup(self, stage: str):
         
         self.batch_size = self.cfg.train.batch_size
-
     
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
-            
             self.cifar100_train, self.cifar100_val = self._get_train_dataset()
 
         # Assign test dataset for use in dataloader(s)

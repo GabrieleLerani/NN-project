@@ -28,7 +28,7 @@ class ImageDataModule(pl.LightningDataModule):
     def __init__(
         self,
         cfg,
-        data_dir: str = "data/datasets",
+        data_dir: str = "datasets",
     ):
 
         super().__init__()
@@ -44,7 +44,7 @@ class ImageDataModule(pl.LightningDataModule):
         self.val_split = 0.1
 
         # Determine data_type
-        self.type = cfg.data.type
+        self.type = cfg.data.dataset
         self.cfg = cfg
 
         self._yaml_parameters()
@@ -59,7 +59,7 @@ class ImageDataModule(pl.LightningDataModule):
                 transforms.Lambda(lambda x: x / 255.0),
             ]
         )
-        if self.type == "sequence":
+        if self.type == "s_image":
             self.transform.transforms.append(
                 transforms.Lambda(lambda x: x.view(-1))
             )  # flatten the image to 1024 pixels
@@ -74,41 +74,40 @@ class ImageDataModule(pl.LightningDataModule):
 
         if hidden_channels == 140:
 
-            if self.type == "default":
+            if self.type == "image":
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
-
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2085.43)
                 OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
 
-            elif self.type == "sequence":
+            elif self.type == "s_image":
                 OmegaConf.update(self.cfg, "train.weight_decay", 0)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
-
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 4005.15)
+
         elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
 
-            if self.type == "default":
+            if self.type == "image":
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
-
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2306.08)
-            elif self.type == "sequence":
+            elif self.type == "s_image":
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
-
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 4005.15)
+
 
     def prepare_data(self):
         if not self.data_dir.is_dir():
             CIFAR10(self.data_dir, train=True, download=True)
             CIFAR10(self.data_dir, train=False, download=True)
+
 
     def setup(self, stage: str):
         self._set_transform()
@@ -197,7 +196,7 @@ if __name__ == "__main__":
 
     dm = ImageDataModule(
         cfg=cfg,
-        data_dir="data/datasets",
+        data_dir="datasets",
     )
     dm.prepare_data()
     dm.setup(stage="fit")

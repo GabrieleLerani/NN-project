@@ -17,7 +17,6 @@ from tqdm import tqdm
 
 nltk.download("punkt_tab")
 
-
 from torchvision import transforms
 
 
@@ -33,8 +32,6 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.max_length = 5
         self.special_tokens = ["<unk>", "<bos>", "<eos>"]
 
-        # Determine data_type
-        self.type = cfg.data.type
         self.cfg = cfg
 
         self._yaml_parameters()
@@ -56,6 +53,7 @@ class ListOpsDataModule(pl.LightningDataModule):
         if hidden_channels == 140:
             OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
+
         elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.25)
