@@ -16,3 +16,4 @@ torchmetrics
 tensorboard
 PySoundFile
 tqdm
+nltk
