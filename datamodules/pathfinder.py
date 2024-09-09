@@ -92,9 +92,6 @@ class PathfinderDataModule(pl.LightningDataModule):
             "hard": "curv_contour_length_14",
         }[level]
 
-        # TODO dataset_pathfinderx = load_dataset("allenai/lra_pathfinder", "pathfinderx")
-
-        # Save parameters to self
         data_dir = data_dir + f"/lra_release/pathfinder{resolution}/{level_dir}"
         self.data_dir = Path(data_dir)
         self.type = cfg.data.type
@@ -106,7 +103,7 @@ class PathfinderDataModule(pl.LightningDataModule):
         self.val_split = val_split
         self.test_split = test_split
 
-        self.num_workers = 0  # for google colab training
+        self.num_workers = 7
 
         self._yaml_parameters()
 
@@ -115,7 +112,9 @@ class PathfinderDataModule(pl.LightningDataModule):
             # Create data directory if it doesn't exist
             os.makedirs(self.data_dir, exist_ok=True)
 
-            if not os.path.exists(Path(self.data_dir) / "lra_release" / "lra_release.gz"):
+            if not os.path.exists(
+                Path(self.data_dir) / "lra_release" / "lra_release.gz"
+            ):
                 self.download_lra_release(self.data_dir)
             else:
                 print("Zip already downloaded. Skipping download.")
@@ -128,34 +127,29 @@ class PathfinderDataModule(pl.LightningDataModule):
 
         # Download the file
         with requests.get(url, stream=True) as r:
-            total = int(r.headers.get('content-length', 0))
+            total = int(r.headers.get("content-length", 0))
             r.raise_for_status()
-            with open(
-                local_filename,
-                "wb"
-            ) as f, tqdm(
+            with open(local_filename, "wb") as f, tqdm(
                 desc=local_filename,
                 total=total,
-                unit='iB',
+                unit="iB",
                 unit_scale=True,
                 unit_divisor=1024,
-            ) as bar:                    
+            ) as bar:
                 for chunk in r.iter_content(chunk_size=8192):
                     size = f.write(chunk)
                     bar.update(size)
-
 
     def extract_lra_release(self, data_dir):
         local_filename = os.path.join(data_dir, "lra_release.gz")
 
         # Extract the tar.gz file
         with tarfile.open(local_filename, "r:gz") as tar:
-            for member in tqdm(tar.getmembers(), desc='Extracting'):
+            for member in tqdm(tar.getmembers(), desc="Extracting"):
                 tar.extract(member)
 
         # Optionally, remove the tar.gz file after extraction
         os.remove(local_filename)
-
 
     def setup(self, stage=None):
         self._set_transform()

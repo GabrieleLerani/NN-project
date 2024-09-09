@@ -1,14 +1,22 @@
-from pathlib import Path
-
-import os
-import torch
-from torch.utils.data import DataLoader
 from torchvision import transforms
 import pytorch_lightning as pl
+from torch.utils.data import random_split
+
 
 from datasets import load_dataset, DatasetDict
+from torchvision.datasets import CIFAR10
+from torchvision.transforms import functional as F
 
 from omegaconf import OmegaConf
+import pytorch_lightning as pl
+from torch.utils.data import DataLoader
+import os
+import torch
+from pathlib import Path
+from datasets import load_dataset, DatasetDict
+from omegaconf import OmegaConf
+import numpy as np
+from nltk.tokenize import word_tokenize
 
 
 class ImageDataModule(pl.LightningDataModule):
@@ -20,85 +28,41 @@ class ImageDataModule(pl.LightningDataModule):
     def __init__(
         self,
         cfg,
-        data_dir: str = "datasets",
-        val_split=0.0,
+        data_dir: str = "data/datasets",
     ):
 
         super().__init__()
 
         # Save parameters to self
-        self.data_dir = Path(data_dir) / "IMAGE_LRA"
+        self.data_dir = Path(data_dir) / "IMG_LRA"
         self.num_workers = 7
+        self.batch_size = cfg.train.batch_size
+        self.serialized_dataset_path = os.path.join(
+            self.data_dir, "preprocessed_dataset_img_lra"
+        )
 
-        self.val_split = val_split
+        self.val_split = 0.1
 
         # Determine data_type
-        self.type = cfg.data.dataset
+        self.type = cfg.data.type
         self.cfg = cfg
 
         self._yaml_parameters()
-
-    def prepare_data(self):
-        if not self.data_dir.is_dir():
-            if self.type == "sequence":  # default
-                self.dataset = load_dataset(
-                    "allenai/lra_image", "cifar10", cache_dir=self.data_dir
-                )
-            elif self.data_type == "default":
-                self.dataset = load_dataset(
-                    "allenai/lra_image", "cifar10_images", cache_dir=self.data_dir
-                )
-
-    def setup(self, stage=None):
-
-        self._set_transform()
-
-        self.batch_size = self.cfg.train.batch_size
-
-        self.dataset.set_format(type="torch", columns=["input_ids", "label"])
-
-        self.train_dataset, self.test_dataset = (
-            self.dataset["train"],
-            self.dataset["test"],
-        )
-
-        def collate_batch(batch):
-            input_ids = [data["input_ids"] for data in batch]
-            labels = [data["label"] for data in batch]
-
-            padded_input_ids = torch.nn.utils.rnn.pad_sequence(
-                [torch.tensor(ids) for ids in input_ids],
-                batch_first=True,
-                padding_value=self.pad_token_id,
-            )
-
-            if padded_input_ids.size(1) > self.max_length:
-                padded_input_ids = padded_input_ids[
-                    :, -self.max_length :
-                ]  # truncate to max_length
-            else:
-                # Pad to max_length on the left (if needed)
-                padding_size = self.max_length - padded_input_ids.size(1)
-                padded_input_ids = torch.nn.functional.pad(
-                    padded_input_ids,
-                    (padding_size, 0),  # pad on the left
-                    value=self.pad_token_id,
-                )
-
-            input_tensor = padded_input_ids.unsqueeze(1).float()
-            label_tensor = torch.tensor(labels)
-
-            return input_tensor, label_tensor
-
-        self.collate_fn = collate_batch
 
     def _set_transform(self):
 
         self.transform = transforms.Compose(
             [
                 transforms.ToTensor(),
+                transforms.Grayscale(num_output_channels=1),
+                transforms.Lambda(lambda x: x.to(torch.float)),
+                transforms.Lambda(lambda x: x / 255.0),
             ]
         )
+        if self.type == "sequence":
+            self.transform.transforms.append(
+                transforms.Lambda(lambda x: x.view(-1))
+            )  # flatten the image to 1024 pixels
 
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
@@ -141,58 +105,109 @@ class ImageDataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 4005.15)
 
+    def prepare_data(self):
+        if not self.data_dir.is_dir():
+            CIFAR10(self.data_dir, train=True, download=True)
+            CIFAR10(self.data_dir, train=False, download=True)
+
+    def setup(self, stage: str):
+        self._set_transform()
+
+        self.batch_size = self.cfg.train.batch_size
+
+        # Assign train/val datasets for use in dataloaders
+        if stage == "fit":
+            self.train_dataset, self.val_dataset = self._get_train_dataset()
+
+        # Assign test dataset for use in dataloader(s)
+        if stage == "test":
+            self.test_dataset = CIFAR10(
+                self.data_dir, train=False, transform=self.transform
+            )
+            # print(f'Test set size: {len(self.cifar10_test)}')
+
+        if stage == "predict":
+            self.test_dataset = CIFAR10(self.data_dir, train=False)
+            print(f"Prediction set size: {len(self.cifar10_predict)}")
+
+    def _get_train_dataset(self):
+        FULL_TRAIN_SIZE = 45000
+        FULL_VAL_SIZE = 5000
+        self.cifar10_full = CIFAR10(self.data_dir, train=True, transform=self.transform)
+
+        # Split the full dataset into train and validation sets
+        train_full, val_full = random_split(
+            self.cifar10_full,
+            [FULL_TRAIN_SIZE, FULL_VAL_SIZE],
+            generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+        )
+
+        if self.cfg.data.reduced_dataset:
+            REDUCED_TRAIN_SIZE = 500
+            REDUCED_VAL_SIZE = 100
+
+            train, _ = random_split(
+                train_full,
+                [REDUCED_TRAIN_SIZE, FULL_TRAIN_SIZE - REDUCED_TRAIN_SIZE],
+                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+            )
+            val, _ = random_split(
+                val_full,
+                [REDUCED_VAL_SIZE, FULL_VAL_SIZE - REDUCED_VAL_SIZE],
+                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+            )
+        else:
+            train, val = train_full, val_full
+
+        print(f"Training set size: {len(train)}")
+        print(f"Validation set size: {len(val)}")
+        return train, val
+
     def train_dataloader(self):
-        train_dataloader = DataLoader(
+        return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
-            num_workers=self.num_workers,
             drop_last=True,
-            collate_fn=self.collate_fn,
         )
-        return train_dataloader
 
     def val_dataloader(self):
-        val_dataloader = DataLoader(
+        return DataLoader(
             self.val_dataset,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers,
-            collate_fn=self.collate_fn,
         )
-        return val_dataloader
 
     def test_dataloader(self):
-        test_dataloader = DataLoader(
+        return DataLoader(
             self.test_dataset,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers,
-            collate_fn=self.collate_fn,
         )
-        return test_dataloader
+
+    def predict_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+        )
 
 
 if __name__ == "__main__":
 
     cfg = OmegaConf.load("config/config.yaml")
+
     dm = ImageDataModule(
         cfg=cfg,
-        data_dir="./data/datasets",
+        data_dir="data/datasets",
     )
     dm.prepare_data()
-    dm.setup()
-    # Retrieve and print a sample
+    dm.setup(stage="fit")
     train_loader = dm.train_dataloader()
 
-    # Get a batch of data
     for images, labels in train_loader:
         print(f"Batch of images shape: {images.shape}")
         print(f"Batch of labels: {labels}")
-
-        # Print the first image and label in the batch
         print(f"First image tensor: {images[0]}")
         print(f"First label: {labels[0]}")
-
-        # Break after first batch for demonstration
         break
