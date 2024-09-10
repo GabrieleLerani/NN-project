@@ -34,7 +34,7 @@ class Cifar10DataModule(pl.LightningDataModule):
         ])
 
         if self.type == "s_cifar10":
-            self.transform.transforms.append(transforms.Lambda(lambda x: x.view(-1))) # flatten the image to 1024 pixels
+            self.transform.transforms.append(transforms.Lambda(lambda x: x.view(3, -1))) # flatten the image to 1024 pixels, preserve 3 channels
 
 
     def _yaml_parameters(self):
