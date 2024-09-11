@@ -107,7 +107,7 @@ class SpeechCommandsDataModule(L.LightningDataModule):
 
         # X shape (34975, 16000, 1)
 
-        if self.type == "sc_mfcc":
+        if self.type == "speech_mfcc":
             # afetr squeeze shape of X is (34975, 16000) and then mfcc becomes (34975,20,time_frames)
             # where time_frames depends on the audio length and the parameters used (like n_fft and hop_length).
             X = torchaudio.transforms.MFCC(
@@ -117,7 +117,7 @@ class SpeechCommandsDataModule(L.LightningDataModule):
                 1, 2
             )  # transpose normalization and transpose back
 
-        elif self.type == "sc_raw":
+        elif self.type == "speech_raw":
             # remove last dim and add the channle dim
             # the shape of X is (34975, 1, 16000)
             X = X.unsqueeze(1).squeeze(-1)
