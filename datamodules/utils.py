@@ -20,12 +20,12 @@ def get_data_module(cfg : OmegaConf):
     if "mnist" in cfg.data.dataset: 
         from .mnist import MnistDataModule
         return MnistDataModule(cfg)
-    elif "cifar10" in cfg.data.dataset:
-        from .cifar10 import Cifar10DataModule
-        return Cifar10DataModule(cfg)
     elif cfg.data.dataset == "cifar100":
         from .cifar100 import Cifar100DataModule
         return Cifar100DataModule(cfg)
+    elif "cifar10" in cfg.data.dataset:
+        from .cifar10 import Cifar10DataModule
+        return Cifar10DataModule(cfg)
     elif cfg.data.dataset == "stl10":
         from .stl10 import STL10DataModule
         return STL10DataModule(cfg)
