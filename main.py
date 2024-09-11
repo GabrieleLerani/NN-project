@@ -56,16 +56,24 @@ def setup_trainer_components(cfg: OmegaConf):
         path = os.path.join("checkpoints", filename)
         os.makedirs(path, exist_ok=True)
 
-        checkpoint_callback = ModelCheckpoint(
+        path_top = os.path.join(path, "top")
+        os.makedirs(path_top, exist_ok=True)
+        checkpoint_top_callback = ModelCheckpoint(
             monitor="accuracy",
-            dirpath=path,
+            dirpath=path_top,
             save_top_k=1,
             every_n_epochs=1,
             mode="max"
         )
+        path_last = os.path.join(path, "last")
+        os.makedirs(path_last, exist_ok=True)
+        checkpoint_last_callback = ModelCheckpoint(
+            dirpath=path_last,
+            every_n_epochs=1,
+        )
         early_stop_callback = EarlyStopping(
-            monitor="val_loss", 
-            patience=cfg.train.max_epoch_no_improvement, 
+            monitor="val_loss",
+            patience=cfg.train.max_epoch_no_improvement,
             verbose=True
         )
         model_summary_callback = ModelSummary(
@@ -74,7 +82,7 @@ def setup_trainer_components(cfg: OmegaConf):
         kernel_logger_callback = KernelLogger(
             filename
         )
-        callbacks.extend([kernel_logger_callback, model_summary_callback, checkpoint_callback, early_stop_callback])
+        callbacks.extend([kernel_logger_callback, model_summary_callback, checkpoint_top_callback, checkpoint_last_callback, early_stop_callback])
 
     # Setup profiler
     profiler = None
@@ -112,10 +120,13 @@ def train(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:
     trainer.validate(model, datamodule)
     trainer.test(model, datamodule)
 
-
 def get_checkpoint_path(cfg: OmegaConf) -> str:
     filename = f"{cfg.data.dataset}_{cfg.net.no_blocks}_{cfg.net.hidden_channels}"
     path = os.path.join("checkpoints", filename)
+    if (cfg.load_model.model == "last"):
+        path = os.path.join(path, "last")
+    elif (cfg.load_model.model == "top"):
+        path = os.path.join(path, "top")
     # there should be only one file
     files = os.listdir(path)
     checkpoint_path = os.path.join(path, files[0])
@@ -127,6 +138,10 @@ def get_checkpoint_path(cfg: OmegaConf) -> str:
 def exists_checkpoint_path(cfg: OmegaConf) -> str:
     filename = f"{cfg.data.dataset}_{cfg.net.no_blocks}_{cfg.net.hidden_channels}"
     path = os.path.join("checkpoints", filename)
+    if (cfg.load_model.model == "last"):
+        path = os.path.join(path, "last")
+    elif (cfg.load_model.model == "top"):
+        path = os.path.join(path, "top")
     # there should be only one file
     files = os.listdir(path)
     if len(files) > 0:
