@@ -2,14 +2,14 @@
 
 This repository contains a PyTorch implementation of the Continuous Convolutional Neural Network (CCNN) as described in the paper [*Towards a General Purpose CNN for Long Range Dependencies in ND*](https://arxiv.org/abs/2206.03398) by Romero et al. This CCNN is capable of handling arbitrary input resolutions, dimensionalities, and data lengths using continuous convolutional kernels.
 
-## Features
+## :sparkles: Features
 
 - Handles data of arbitrary resolution, dimensionality, and length without the need for task-specific architectures.
 - Models long-range dependencies efficiently at every layer using continuous kernels.
 - Supports both sequential (1D) and visual (2D) data.
 - Works with irregularly-sampled data and test-time resolution changes.
 
-## Repository structure
+## :file_folder: Repository structure
 ```
 NN-project
 ├── ckconv/                 # main components
@@ -30,15 +30,17 @@ NN-project
 └── README.md               # Project documentation
 
 ```
-## Technologies Used
+## :computer: Technologies Used
 
-- **PyTorch**: We used PyTorch for defining the neural network model and performing tensor operations.
-- **PyTorch Lightning**: PyTorch Lightning was used to reduce the boilerplate code required for training and to structure the training loop in a cleaner, more manageable way.
-- **Tensorborad**: Used to easily visualize and track metrics improvement during training
-- **OmegaConf**: The `config.yaml` file is managed using OmegaConf, which allows for flexible and hierarchical configuration management.
+- <img src="https://github.com/user-attachments/assets/378e3efa-969d-43be-a9ef-e9e216b706e0" alt="PyTorch Logo" width="20"> **PyTorch**: used for defining the neural network model and performing tensor operations.
+- <img src="https://github.com/user-attachments/assets/953f0cdb-0047-4ae1-8a15-920e3f17b269" alt="Lightning Logo" width="20">**PyTorch Lightning**: Used to reduce the boilerplate code required for training and to structure the training loop in a cleaner, more manageable way.
   
-## Note on training and dataset
-Since our limited hardware resources we used the daily **T4 GPU** provided by the VM of **Google Colab**. It allowed us to test on 1D and 2D dataset but it has been not enough for multi dimensional data which requires more power and memory.
+- <img src="https://github.com/user-attachments/assets/0c30078f-adab-4a04-bf91-0011e3fa6737" alt="Tensorboard Logo" width="20"> **Tensorborad**: Used to easily visualize and track metrics improvement during training.
+- <img src="https://github.com/user-attachments/assets/f1865c35-13c1-4b22-b6d7-c8ec75e313da" alt="Hydra Logo" width="20">
+  **Hydra**: The `config.yaml` file is managed using OmegaConf, which allows for flexible and hierarchical configuration management.
+  
+## :orange_book: Note on training and dataset
+Since our limited hardware resources we trained the model using the VM of **Google Colab** with a **T4 GPU, 12 GB RAM, 100 GB on disk**. It allowed us to test on 1D and 2D dataset but it has been not enough for multi dimensional data which requires more power and memory.
 
 We are using a **light version of the Long Range Arena (LRA)** dataset due to memory constraints. The full LRA dataset requires a substantial amount of memory, which can make it difficult to run on machines with limited resources. As a solution, we include only two tasks from the LRA dataset:
 
@@ -46,7 +48,7 @@ We are using a **light version of the Long Range Arena (LRA)** dataset due to me
 - **ListOps1000**: A task that involves learning hierarchical structures and operations on sequences up to a length of 1000.
 
 
-## Installation
+## :wrench: Installation
 
 1. **Clone the repository:**
 
@@ -63,7 +65,7 @@ We are using a **light version of the Long Range Arena (LRA)** dataset due to me
    ```
    pip install -r requirements.txt
    ```
-## Configuration file
+## :clipboard: Configuration file
    The `config.yaml` file contains the configuration settings for building, training, and testing the neural network model. The file is split into different sections to handle specific parts of the model.
 
 - **net:** Defines the architecture of the neural network, including the number of layers, channels, and the type of block used.
@@ -148,7 +150,7 @@ All the training parameters not explicetely defined are replaced with the optima
    python main.py data.dataset=cifar10 train.logger=False train.callbacks=False
    ```
 
-## Aknowledgments
+## :clap: Aknowledgments
 We really thank the authors of the original work
 ```
 @article{knigge2023modelling,
