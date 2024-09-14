@@ -10,7 +10,7 @@ class SepFlexConv(nn.Module):
     """
     SeparableFlexConv (SepFlexConv) is a depthwise separable version of FlexConv (Romero et al., 2022a)
     
-    ConstructMaskedKernel is a continuous version of the kernel whichs multiplied by a Gaussian mask.
+    ConstructMaskedKernel outputs a continuous version of the kernel which is multiplied by a Gaussian mask.
     
     The gaussian mask has learnable parameters and by learning it the model can learn the size of the convolutional kernel.
 

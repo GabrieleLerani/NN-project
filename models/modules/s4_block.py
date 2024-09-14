@@ -13,7 +13,7 @@ class S4Block(nn.Module):
             |
     | -------------|
     |            BarchNorm             
-    |            SepFlecConv             
+    |            SepFlexConv             
     |            GELU     
     |            DropOut          
     |            PointwiseLinear                
