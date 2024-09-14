@@ -1,6 +1,6 @@
 # Continuous CNN Implementation in PyTorch
 
-This repository contains a PyTorch implementation of the Continuous Convolutional Neural Network (CCNN) as described in the paper *Towards a General Purpose CNN for Long Range Dependencies in ND* by Romero et al. This CCNN is capable of handling arbitrary input resolutions, dimensionalities, and data lengths using continuous convolutional kernels.
+This repository contains a PyTorch implementation of the Continuous Convolutional Neural Network (CCNN) as described in the paper [*Towards a General Purpose CNN for Long Range Dependencies in ND*](https://arxiv.org/abs/2206.03398) by Romero et al. This CCNN is capable of handling arbitrary input resolutions, dimensionalities, and data lengths using continuous convolutional kernels.
 
 ## Features
 
@@ -93,8 +93,6 @@ NN-project
 - `batch_size`: Batch size used during training.
 - `start_factor`: Initial learning rate multiplier.
 - `end_factor`: Final learning rate multiplier.
-- `loss_fn`: Loss function used during training (`cross_entropy` for classification).
-- `optimizer`: Optimizer used for training (`AdamW` in this case).
 - `dropout_rate`: Dropout rate for regularization.
 - `weight_decay`: Weight decay for L2 regularization.
 - `max_epoch_no_improvement`: Early stopping after a specified number of epochs without improvement.
