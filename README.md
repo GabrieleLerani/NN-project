@@ -36,8 +36,7 @@ NN-project
 - <img src="https://github.com/user-attachments/assets/953f0cdb-0047-4ae1-8a15-920e3f17b269" alt="Lightning Logo" width="20">**PyTorch Lightning**: Used to reduce the boilerplate code required for training and to structure the training loop in a cleaner, more manageable way.
   
 - <img src="https://github.com/user-attachments/assets/0c30078f-adab-4a04-bf91-0011e3fa6737" alt="Tensorboard Logo" width="20"> **Tensorborad**: Used to easily visualize and track metrics improvement during training.
-- <img src="https://github.com/user-attachments/assets/f1865c35-13c1-4b22-b6d7-c8ec75e313da" alt="Hydra Logo" width="20">
-  **Hydra**: The `config.yaml` file is managed using OmegaConf, which allows for flexible and hierarchical configuration management.
+- <img src="https://github.com/user-attachments/assets/f1865c35-13c1-4b22-b6d7-c8ec75e313da" alt="Hydra Logo" width="20"> **Hydra**: The `config.yaml` file is managed using OmegaConf, which allows for flexible and hierarchical configuration management.
   
 ## :orange_book: Note on training and dataset
 Since our limited hardware resources we trained the model using the VM of **Google Colab** with a **T4 GPU, 12 GB RAM, 100 GB on disk**. It allowed us to test on 1D and 2D dataset but it has been not enough for multi dimensional data which requires more power and memory.
@@ -141,7 +140,7 @@ When running the `main.py` script, the user can pass the following parameters to
 All the training parameters not explicetely defined are replaced with the optimal hyperparameters suggested in the original paper:
 ![Screenshot from 2024-09-14 16-32-02](https://github.com/user-attachments/assets/9cf6573b-0781-40bc-ab0c-5a9ca3a0b7e8)
 
-#### Example 1: train the model with four s4 blocks, a hidden channel size of 140, and kernel size of 33 on sequencial mnist using gpu
+#### Example 1: train the model with four s4 blocks, a hidden channel size of 140, and kernel size of 33 on sequential mnist using gpu
    ```
    python main.py data.dataset=smnist train.accelerator=gpu net.hidden_channels=140 net.no_blocks=4 kernel.kernel_size=33
    ```
