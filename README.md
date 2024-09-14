@@ -135,7 +135,7 @@ All the training parameters not explicetely defined are replaced with the optima
    ```
 
 ## Aknowledgments
-We really thanks the authors of the original work.
+We really thank the authors of the original work
 ```
 @article{knigge2023modelling,
   title={Modelling Long Range Dependencies in N-D: From Task-Specific to a General Purpose CNN},
