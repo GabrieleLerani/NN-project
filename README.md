@@ -18,18 +18,34 @@ NN-project
 │   ├── conv/               # Standard convolution and FFTConv
 ├── datamodules/            # Dataset loading and preprocessing  
 ├── models/                 
-│   ├── ccnn.py             # Main architecture
-│   ├── modules/            
+    ├── ccnn.py             # Main architecture
+    ├── modules/            
         ├── s4_block.py     # S4 blocks
         ├── utils/          # Avg pool, Batch norm., dropout layer
 ├── config/                 # config.yaml with configuration parameters
+├── checkpoints/            # contains checkpoints of the models
 ├── main.py                 # Entry point for training and evaluation
 ├── requirements.txt        # Python dependencies
 ├── notebooks/              # notebook file for explanation
 └── README.md               # Project documentation
 
 ```
-   
+## Technologies Used
+
+- **PyTorch**: We used PyTorch for defining the neural network model and performing tensor operations.
+- **PyTorch Lightning**: PyTorch Lightning was used to reduce the boilerplate code required for training and to structure the training loop in a cleaner, more manageable way.
+- **Tensorborad**: Used to easily visualize and track metrics improvement during training
+- **OmegaConf**: The `config.yaml` file is managed using OmegaConf, which allows for flexible and hierarchical configuration management.
+  
+## Note on training and dataset
+Since our limited hardware resources we used the daily **T4 GPU** provided by the VM of **Google Colab**. It allowed us to test on 1D and 2D dataset but it has been not enough for multi dimensional data which requires more power and memory.
+
+We are using a **light version of the Long Range Arena (LRA)** dataset due to memory constraints. The full LRA dataset requires a substantial amount of memory, which can make it difficult to run on machines with limited resources. As a solution, we include only two tasks from the LRA dataset:
+
+- **Pathfinder32**: The baseline version of the Pathfinder task, which involves understanding if there is a path connecting two points.
+- **ListOps1000**: A task that involves learning hierarchical structures and operations on sequences up to a length of 1000.
+
+
 ## Installation
 
 1. **Clone the repository:**
