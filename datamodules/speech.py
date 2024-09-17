@@ -6,9 +6,9 @@ import torch
 import os
 from tqdm import tqdm
 from torch.utils.data import random_split
-from utils import normalise_data
 from omegaconf import OmegaConf
 from datasets import load_dataset, DatasetDict, Dataset
+from utils import split_data, feature_normalisation
 
 from pathlib import Path
 from torchvision import transforms
@@ -40,11 +40,30 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         self.speech_dir = os.path.join(
             self.data_dir, "SpeechCommands/speech_commands_v0.02"
         )
+        self.selected_dirs = [
+            "yes",
+            "no",
+            "up",
+            "down",
+            "left",
+            "right",
+            "on",
+            "off",
+            "stop",
+            "go",
+        ]
 
         assert self.type in ["speech_raw", "speech_mfcc"]
         self.cfg = cfg
 
         self._yaml_parameters()
+        self._set_transform()
+
+    def _set_transform(self):
+        # 16 QAM modulation
+        self.transform = torchaudio.transforms.Vol(
+            gain=1.0 / 32768, gain_type="amplitude"
+        )
 
     def _yaml_parameters(self):
         OmegaConf.update(self.cfg, "net.out_channels", 10)
@@ -71,67 +90,57 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         2. Split the dataset
         3. Save the processed dataset
         """
-        ###################################################
-        X = torch.empty(34975, 16000, 1)
-        Y = torch.empty(34975, dtype=torch.long)
-        batch_index = 0
-        y_index = 0
-        for foldername in (
-            "yes",
-            "no",
-            "up",
-            "down",
-            "left",
-            "right",
-            "on",
-            "off",
-            "stop",
-            "go",
-        ):
+        X_list = []
+        Y_list = []
+        class_num = 0
+        for foldername in self.selected_dirs:
             loc = os.path.join(self.speech_dir, foldername)
-            for filename in tqdm(os.listdir(loc)):
+            for filename in os.listdir(loc):
                 audio, _ = torchaudio.load(
-                    os.path.join(loc, filename),
-                    channels_first=False,
+                    os.path.join(loc, filename), channels_first=False
                 )
 
-                audio = audio / 2**15  # normalization to have values in [0,1]
-
-                # Discard samples shorter than 1 second
-                if len(audio) != 16000:
+                if audio.size(0) != 16000:
                     continue
-                X[batch_index] = audio
-                Y[batch_index] = y_index
-                batch_index += 1
-            y_index += 1
 
-        # X shape (34975, 16000, 1)
+                # Apply transformation
+                audio = self.transform(audio)
+
+                # print(audio.shape)
+
+                X_list.append(audio)
+                Y_list.append(torch.tensor(class_num, dtype=torch.float32))
+            class_num += 1
+
+        # Concatenate lists into tensors
+        X = torch.stack(X_list, dim=0)
+        Y = torch.stack(Y_list, dim=0).unsqueeze(-1)
+
+        # X shape (34975, 16000, 1) Y shape (34975,1)
+        # batch-wise transforms
 
         if self.type == "speech_mfcc":
-            # afetr squeeze shape of X is (34975, 16000) and then mfcc becomes (34975,20,time_frames)
+            # after squeeze shape of X is (34975, 16000) and then mfcc becomes (34975,20,time_frames)
             # where time_frames depends on the audio length and the parameters used (like n_fft and hop_length).
             X = torchaudio.transforms.MFCC(
-                log_mels=True, n_mfcc=20, melkwargs=dict(n_fft=200, n_mels=64)
+                log_mels=True, n_mfcc=20, melkwargs=dict(n_fft=200, n_mels=64,hop_length=160)
             )(X.squeeze(-1)).detach()
-            X = normalise_data(X.transpose(1, 2), Y).transpose(
-                1, 2
-            )  # transpose normalization and transpose back
+
+            train_X, _, _ = split_data(X, Y)
+
+            X = feature_normalisation(X, train_X)
 
         elif self.type == "speech_raw":
             # remove last dim and add the channle dim
             # the shape of X is (34975, 1, 16000)
-            X = X.unsqueeze(1).squeeze(-1)
-            X = normalise_data(X, Y)
-        ###################################################
-        # Split data into train, validation, and test sets
-        total_size = len(Y)
-        train_size = int(self.train_split * total_size)  # 80% for training
-        val_size = int(self.val_split * total_size)  # 10% for validation
-        test_size = total_size - train_size - val_size  # Remaining 10% for testing
 
-        train_data, val_data, test_data = random_split(
-            list(zip(X, Y)), [train_size, val_size, test_size]
-        )
+            X = X.unsqueeze(1).squeeze(-1)
+            train_X, _, _ = split_data(X, Y)
+            X = feature_normalisation(X, train_X)
+
+        train_data, val_data, test_data = split_data(X, Y)
+
+        print(train_data.shape)
 
         # Convert splits to Hugging Face datasets
         self.dataset = DatasetDict(
@@ -142,7 +151,7 @@ class SpeechCommandsDataModule(L.LightningDataModule):
             }
         )
 
-        # TODO Save to disk
+        # TODO Save to disk--> slows down computation
         # self.dataset.save_to_disk(self.serialized_dataset_path)
 
     def prepare_data(self):
@@ -224,9 +233,6 @@ if __name__ == "__main__":
     dm.setup(stage="fit")
     train_loader = dm.train_dataloader()
 
-    for images, labels in train_loader:
-        print(f"Batch of images shape: {images.shape}")
-        print(f"Batch of labels: {labels}")
-        print(f"First image tensor: {images[0]}")
-        print(f"First label: {labels[0]}")
+    for batch in train_loader:
+        print(f"Batch of images shape: {batch.shape}")
         break

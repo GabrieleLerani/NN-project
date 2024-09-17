@@ -44,7 +44,7 @@ test:
 
 data:
   data_dir : "datasets"
-  dataset : "sc_mfcc"
+  dataset : "speech_mfcc"
   type: "default"
   reduced_dataset: False
   # this line is used only in datamodules that uses LRA as dataset (pathfinder, listops, etc.)

@@ -13,6 +13,7 @@ from .utils import (
     save_data,
     load_data_from_partition,
     normalise_data,
+    feature_normalisation,
 )
 
 # TODO add Pathfinder and Speech

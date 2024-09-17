@@ -3,46 +3,74 @@ import sklearn.model_selection
 import torch
 import os
 
-def get_data_module(cfg : OmegaConf):
-    
+
+def get_data_module(cfg: OmegaConf):
+
     assert cfg.data.dataset in [
-        "s_mnist","p_mnist",
-        "cifar10","s_cifar10","cifar100",
+        "s_mnist",
+        "p_mnist",
+        "cifar10",
+        "s_cifar10",
+        "cifar100",
         "stl10",
-        "speech_mfcc","speech_raw",
-        "pathfinder","s_pathfinder",
+        "speech_mfcc",
+        "speech_raw",
+        "pathfinder",
+        "s_pathfinder",
         "listops",
-        "image","s_image"
+        "image",
+        "s_image",
     ], "Dataset not supported"
-    assert not (cfg.data.dataset in ["speech_mfcc","speech_raw","pathfinder","s_pathfinder","path_x","image","s_image"] and cfg.data.reduced_dataset), f"Reduced dataset not supported for {cfg.data.dataset}"
+    assert not (
+        cfg.data.dataset
+        in [
+            "speech_mfcc",
+            "speech_raw",
+            "pathfinder",
+            "s_pathfinder",
+            "path_x",
+            "image",
+            "s_image",
+        ]
+        and cfg.data.reduced_dataset
+    ), f"Reduced dataset not supported for {cfg.data.dataset}"
 
     # can be either sequential or permuted mnist
-    if "mnist" in cfg.data.dataset: 
+    if "mnist" in cfg.data.dataset:
         from .mnist import MnistDataModule
+
         return MnistDataModule(cfg)
     elif cfg.data.dataset == "cifar100":
         from .cifar100 import Cifar100DataModule
+
         return Cifar100DataModule(cfg)
     elif "cifar10" in cfg.data.dataset:
         from .cifar10 import Cifar10DataModule
+
         return Cifar10DataModule(cfg)
     elif cfg.data.dataset == "stl10":
         from .stl10 import STL10DataModule
+
         return STL10DataModule(cfg)
     elif "speech" in cfg.data.dataset:
         from .speech import SpeechCommandsModule
+
         return SpeechCommandsModule(cfg)
     elif "pathfinder" in cfg.data.dataset:
         from .pathfinder import PathfinderDataModule
+
         return PathfinderDataModule(cfg)
     elif "image" in cfg.data.dataset:
         from .text import IMDBDataModule
+
         return IMDBDataModule(cfg)
     elif cfg.data.dataset == "listops":
         from .listops import ListOpsDataModule
+
         return ListOpsDataModule(cfg)
-    
+
     # TODO other dataset
+
 
 def split_data(tensor, stratify):
     # 0.7/0.15/0.15 train/val/test split
@@ -68,6 +96,7 @@ def split_data(tensor, stratify):
         stratify=testval_stratify,
     )
     return train_tensor, val_tensor, test_tensor
+
 
 def save_data(dir, **tensors):
     if not os.path.exists(dir):
@@ -106,3 +135,18 @@ def normalise_data(X, y):
         out.append((Xi - mean) / (std + 1e-5))
     out = torch.stack(out, dim=-1)
     return out
+
+
+def feature_normalisation(X, train_X):
+    train_X_no_nan = torch.nan_to_num(train_X, nan=0.0)
+
+    mean = torch.mean(train_X_no_nan, dim=0)
+    std = torch.std(train_X_no_nan, dim=0)
+    mean = mean.unsqueeze(0)
+    std = std.unsqueeze(0)
+
+    print(f"mean {mean.shape} std {std.shape} X {X.shape}")
+
+    X_normalized = (X - mean) / (std + 1e-5)
+
+    return X_normalized
