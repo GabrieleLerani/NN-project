@@ -58,7 +58,6 @@ class ListOpsDataModule(pl.LightningDataModule):
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.25)
 
-
     def _download_lra_release(self):
         url = "https://storage.googleapis.com/long-range-arena/lra_release.gz"
         local_filename = os.path.join(self.data_dir, "lra_release.gz")
@@ -78,7 +77,6 @@ class ListOpsDataModule(pl.LightningDataModule):
                     size = f.write(chunk)
                     bar.update(size)
 
-
     def _extract_lra_release(self):
         local_filename = os.path.join(self.data_dir, "lra_release.gz")
 
@@ -89,7 +87,6 @@ class ListOpsDataModule(pl.LightningDataModule):
 
         # Optionally, remove the tar.gz file after extraction
         os.remove(local_filename)
-
 
     def _loading_pipeline(self):
         """
@@ -188,22 +185,18 @@ class ListOpsDataModule(pl.LightningDataModule):
         print(f"Saving dataset to {self.serialized_dataset_path}...")
         self.dataset.save_to_disk(self.serialized_dataset_path)
 
-
     def prepare_data(self):
         if not self.cfg.data.light_lra:
             if not self.data_dir.is_dir():
                 # Create data directory if it doesn't exist
                 os.makedirs(self.data_dir, exist_ok=True)
 
-            if not os.path.exists(
-                Path(self.data_dir) / "lra_release" / "lra_release.gz"
-            ):
-                self._download_lra_release(self.data_dir)
+            if not os.path.exists(Path(self.data_dir) / "lra_release"):
+                self._download_lra_release()
+                self._extract_lra_release()
+
             else:
                 print("Zip already downloaded. Skipping download.")
-
-            self._extract_lra_release(self.data_dir)
-        
 
     def setup(self, stage):
 
@@ -287,14 +280,6 @@ class ListOpsDataModule(pl.LightningDataModule):
             collate_fn=self.collate_fn,
         )
 
-    def predict_dataloader(self):
-        return DataLoader(
-            self.test_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            collate_fn=self.collate_fn,
-        )
-
 
 if __name__ == "__main__":
 
@@ -302,7 +287,7 @@ if __name__ == "__main__":
 
     dm = ListOpsDataModule(
         cfg=cfg,
-        data_dir="data/datasets",
+        data_dir="datasets",
     )
     dm.prepare_data()
     dm.setup(stage="fit")

@@ -8,10 +8,24 @@ from tqdm import tqdm
 from torch.utils.data import random_split
 from omegaconf import OmegaConf
 from datasets import load_dataset, DatasetDict, Dataset
-from utils import split_data, feature_normalisation
+from datamodules.utils import feature_normalisation
+from torch.utils.data import Dataset
+
 
 from pathlib import Path
 from torchvision import transforms
+
+
+class TensorDataset(Dataset):
+    def __init__(self, X, Y):
+        self.X = X
+        self.Y = Y
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.Y[idx]
 
 
 class SpeechCommandsDataModule(L.LightningDataModule):
@@ -29,11 +43,12 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         self.num_workers = 7
         self.batch_size = cfg.train.batch_size
         self.serialized_dataset_path = os.path.join(
-            self.data_dir, "preprocessed_dataset_speech"
+            self.data_dir, "preprocessed_dataset_speech.pth"
         )
 
-        self.val_split = 0.1
-        self.train_split = 0.9
+        self.val_split = 0.15
+        self.train_split = 0.7
+        self.test_split = 0.15
 
         # Determine data_type
         self.type = cfg.data.dataset
@@ -109,50 +124,75 @@ class SpeechCommandsDataModule(L.LightningDataModule):
                 # print(audio.shape)
 
                 X_list.append(audio)
-                Y_list.append(torch.tensor(class_num, dtype=torch.float32))
+                Y_list.append(torch.tensor(class_num, dtype=torch.long))
             class_num += 1
 
         # Concatenate lists into tensors
         X = torch.stack(X_list, dim=0)
-        Y = torch.stack(Y_list, dim=0).unsqueeze(-1)
-
+        Y = torch.stack(Y_list, dim=0)
         # X shape (34975, 16000, 1) Y shape (34975,1)
         # batch-wise transforms
 
         if self.type == "speech_mfcc":
             # after squeeze shape of X is (34975, 16000) and then mfcc becomes (34975,20,time_frames)
             # where time_frames depends on the audio length and the parameters used (like n_fft and hop_length).
+            # n_freqs = n_fft // 2 + 1
             X = torchaudio.transforms.MFCC(
-                log_mels=True, n_mfcc=20, melkwargs=dict(n_fft=200, n_mels=64,hop_length=160)
+                log_mels=True,
+                n_mfcc=20,
+                melkwargs=dict(n_fft=400, n_mels=64),
             )(X.squeeze(-1)).detach()
-
-            train_X, _, _ = split_data(X, Y)
-
-            X = feature_normalisation(X, train_X)
 
         elif self.type == "speech_raw":
             # remove last dim and add the channle dim
             # the shape of X is (34975, 1, 16000)
 
             X = X.unsqueeze(1).squeeze(-1)
-            train_X, _, _ = split_data(X, Y)
-            X = feature_normalisation(X, train_X)
 
-        train_data, val_data, test_data = split_data(X, Y)
+        # dataset creation
 
-        print(train_data.shape)
+        tensor_dataset = TensorDataset(X, Y)
+
+        # set dataset splits lentgths
+        len_dataset = X.size(0)
+        val_len = int(self.val_split * len_dataset)
+        test_len = int(self.test_split * len_dataset)
+        train_len = len_dataset - val_len - test_len
+
+        self.train_dataset, self.val_dataset, self.test_dataset = random_split(
+            tensor_dataset,
+            [train_len, val_len, test_len],
+            generator=torch.Generator(self.cfg.train.accelerator).manual_seed(
+                getattr(self, "seed", 42)
+            ),
+        )
+
+        # cropping train_X for normalization
+        train_X = [x for x, _ in self.train_dataset]
+        train_X = torch.stack(train_X, dim=0)
+        train_Y = [y for _, y in self.train_dataset]
+        train_Y = torch.stack(train_Y, dim=0)
+        train_X_normalised = feature_normalisation(train_X)
+
+        normalized_train_data = list(zip(train_X_normalised, train_Y))
+
+        # Create a new dataset with normalized inputs
+        self._train_dataset = TensorDataset(
+            torch.stack([x for x, _ in normalized_train_data]),
+            torch.stack([y for _, y in normalized_train_data]),
+        )
 
         # Convert splits to Hugging Face datasets
         self.dataset = DatasetDict(
             {
-                "train": train_data,
-                "val": val_data,
-                "test": test_data,
+                "train": self.train_dataset,
+                "val": self.val_dataset,
+                "test": self.test_dataset,
             }
         )
 
-        # TODO Save to disk--> slows down computation
-        # self.dataset.save_to_disk(self.serialized_dataset_path)
+        # Save to disk
+        torch.save(self.dataset, self.serialized_dataset_path)
 
     def prepare_data(self):
         if not self.data_dir.is_dir():
@@ -170,7 +210,7 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         # if already done load the preprocessed dataset
         if os.path.exists(self.serialized_dataset_path):
             print(f"Loading dataset from {self.serialized_dataset_path}...")
-            self.dataset = DatasetDict.load_from_disk(self.serialized_dataset_path)
+            self.dataset = torch.load(self.serialized_dataset_path)
         else:
             # pipeline to load data
             self._loading_pipeline()
@@ -186,9 +226,6 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         if stage == "test":
             self.test_dataset = self.dataset["test"]
 
-        if stage == "predict":
-            self.test_dataset = self.dataset["test"]
-
     def train_dataloader(self):
         return DataLoader(
             self.train_dataset,
@@ -202,18 +239,11 @@ class SpeechCommandsDataModule(L.LightningDataModule):
             self.val_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            persistent_workers=True,
             shuffle=False,
         )
 
     def test_dataloader(self):
-        return DataLoader(
-            self.test_dataset,
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            shuffle=False,
-        )
-
-    def predict_dataloader(self):
         return DataLoader(
             self.test_dataset,
             batch_size=self.batch_size,
@@ -233,6 +263,6 @@ if __name__ == "__main__":
     dm.setup(stage="fit")
     train_loader = dm.train_dataloader()
 
-    for batch in train_loader:
-        print(f"Batch of images shape: {batch.shape}")
+    for x, y in train_loader:
+        print(f"Batch of images shape: {x.shape} {y.shape}")
         break

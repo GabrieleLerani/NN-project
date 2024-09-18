@@ -294,15 +294,12 @@ if __name__ == "__main__":
 
     dm = TextDataModule(
         cfg=cfg,
-        data_dir="data/datasets",
+        data_dir="datasets",
     )
     dm.prepare_data()
     dm.setup(stage="fit")
     train_loader = dm.train_dataloader()
 
     for images, labels in train_loader:
-        print(f"Batch of images shape: {images.shape}")
-        print(f"Batch of labels: {labels}")
-        print(f"First image tensor: {images[0]}")
-        print(f"First label: {labels[0]}")
+        print(f"Batch of images shape: {images.shape} {labels.shape}")
         break

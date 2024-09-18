@@ -170,3 +170,4 @@ if __name__ == "__main__":
     
     cifar10.setup("fit")
     cifar10.show_samples(2)
+    

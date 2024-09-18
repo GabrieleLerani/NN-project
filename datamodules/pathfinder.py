@@ -10,7 +10,6 @@ from torchvision import transforms
 from PIL import Image
 import pytorch_lightning as pl
 import requests
-import matplotlib.pyplot as plt
 from omegaconf import OmegaConf
 
 
@@ -85,7 +84,7 @@ class PathfinderDataModule(pl.LightningDataModule):
         level = "easy"
         resolution = "32"
 
-        # if the light version (preprocessed by us) is used, 
+        # if the light version (preprocessed by us) is used,
         # then level = easy and resolution = 32
         if cfg.data.light_lra:
             level = "easy"
@@ -99,13 +98,13 @@ class PathfinderDataModule(pl.LightningDataModule):
 
         data_dir = data_dir + f"/lra_release/pathfinder{resolution}/{level_dir}"
         self.data_dir = Path(data_dir)
-        self.type = cfg.data.dataset
+        self.type = cfg.data.type
         self.cfg = cfg
 
         self.val_split = 0.1
         self.test_split = 0.1
 
-        self.num_workers = 7
+        self.num_workers = 0
 
         self._yaml_parameters()
 
@@ -116,15 +115,12 @@ class PathfinderDataModule(pl.LightningDataModule):
                 # Create data directory if it doesn't exist
                 os.makedirs(self.data_dir, exist_ok=True)
 
-            if not os.path.exists(
-                Path(self.data_dir) / "lra_release" / "lra_release.gz"
-            ):
+            if not os.path.exists(Path(self.data_dir)):
                 self.download_lra_release(self.data_dir)
+                self.extract_lra_release(self.data_dir)
+
             else:
                 print("Zip already downloaded. Skipping download.")
-
-            self.extract_lra_release(self.data_dir)
-
 
     def download_lra_release(self, data_dir):
         url = "https://storage.googleapis.com/long-range-arena/lra_release.gz"
@@ -145,7 +141,6 @@ class PathfinderDataModule(pl.LightningDataModule):
                     size = f.write(chunk)
                     bar.update(size)
 
-
     def extract_lra_release(self, data_dir):
         local_filename = os.path.join(data_dir, "lra_release.gz")
 
@@ -157,8 +152,14 @@ class PathfinderDataModule(pl.LightningDataModule):
         # Optionally, remove the tar.gz file after extraction
         os.remove(local_filename)
 
+    def _set_transform(self):
+        self.transform = transforms.Compose([transforms.ToTensor(),])
+        if self.type == "sequential":
+            self.transform.transforms.append(
+                transforms.Lambda(lambda x: x.view(1, -1))
+            )  # flatten the image
 
-    def setup(self, stage=None):
+    def setup(self, stage:str):
         self._set_transform()
 
         self.batch_size = self.cfg.train.batch_size
@@ -180,18 +181,6 @@ class PathfinderDataModule(pl.LightningDataModule):
             ),
         )
 
-    def _set_transform(self):
-        self.transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-            ]
-        )
-
-        if self.type == "s_pathfinder":
-            self.transform.transforms.append(
-                transforms.Lambda(lambda x: x.view(-1))
-            )  # flatten the image
-
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
 
@@ -204,25 +193,25 @@ class PathfinderDataModule(pl.LightningDataModule):
         if hidden_channels == 140:
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
 
-            if self.type == "pathfinder":
+            if self.type == "default":
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 1239.14)
 
-            elif self.type == "s_pathfinder":
+            elif self.type == "sequential":
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2272.56)
 
         elif hidden_channels == 380:
 
-            if self.type == "pathfinder":
+            if self.type == "default":
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
                 OmegaConf.update(self.cfg, "train.weight_decay", 0)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 3908.32)
 
-            elif self.type == "s_pathfinder":
+            elif self.type == "sequential":
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
@@ -263,33 +252,11 @@ if __name__ == "__main__":
     # prompt: Generate the code to instantiate PathFinderDataModule
 
     cfg = OmegaConf.load("config/config.yaml")
-    dm = PathfinderDataModule(
-        cfg=cfg,
-        data_dir="datasets",
-    )
+    dm = PathfinderDataModule(cfg=cfg)
     dm.prepare_data()
     dm.setup()
-    # Fetch a sample from the training dataset
-    sample_idx = 0  # Index of the sample you want to print
-    sample = dm.train_dataset[sample_idx]
+    train_loader = dm.train_dataloader()
 
-    # If the sample is a tuple (image, label)
-    if isinstance(sample, tuple):
-        image, label = sample
-    else:
-        image = sample
-        label = None
-
-    # Print label
-    if label is not None:
-        print(f"Label: {label}")
-
-    # Print image
-    # Assuming image is a PIL image or a tensor that can be converted to PIL
-    if isinstance(image, torch.Tensor):
-        image = transforms.ToPILImage()(image)
-
-    plt.imshow(image)
-    plt.title(f"Sample {sample_idx}")
-    plt.axis("off")  # Hide axis
-    plt.show()
+    for x, y in train_loader:
+        print(f"Batch of images shape: {x.shape} {y.shape}")
+        break

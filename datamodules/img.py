@@ -44,7 +44,7 @@ class ImageDataModule(pl.LightningDataModule):
         self.val_split = 0.1
 
         # Determine data_type
-        self.type = cfg.data.dataset
+        self.type = cfg.data.type
         self.cfg = cfg
 
         self._yaml_parameters()
@@ -54,14 +54,18 @@ class ImageDataModule(pl.LightningDataModule):
         self.transform = transforms.Compose(
             [
                 transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=(0.49139968, 0.48215841, 0.44653091),
+                    std=(0.24703223, 0.24348513, 0.26158784),
+                ),
                 transforms.Grayscale(num_output_channels=1),
                 transforms.Lambda(lambda x: x.to(torch.float)),
                 transforms.Lambda(lambda x: x / 255.0),
             ]
         )
-        if self.type == "s_image":
+        if self.type == "sequential":
             self.transform.transforms.append(
-                transforms.Lambda(lambda x: x.view(-1))
+                transforms.Lambda(lambda x: x.view(1, -1))
             )  # flatten the image to 1024 pixels
 
     def _yaml_parameters(self):
@@ -70,44 +74,42 @@ class ImageDataModule(pl.LightningDataModule):
         OmegaConf.update(self.cfg, "train.batch_size", 50)
         OmegaConf.update(self.cfg, "train.epochs", 210)
         OmegaConf.update(self.cfg, "net.in_channels", 1)
-        OmegaConf.update(self.cfg, "net.out_channels", 2)
+        OmegaConf.update(self.cfg, "net.out_channels", 10)
 
         if hidden_channels == 140:
 
-            if self.type == "image":
+            if self.type == "default":
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2085.43)
                 OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
 
-            elif self.type == "s_image":
+            elif self.type == "sequential":
+                OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.weight_decay", 0)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
-                OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 4005.15)
 
         elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
 
-            if self.type == "image":
+            if self.type == "default":
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2306.08)
-            elif self.type == "s_image":
+            elif self.type == "sequential":
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 4005.15)
 
-
     def prepare_data(self):
         if not self.data_dir.is_dir():
             CIFAR10(self.data_dir, train=True, download=True)
             CIFAR10(self.data_dir, train=False, download=True)
-
 
     def setup(self, stage: str):
         self._set_transform()
@@ -122,10 +124,6 @@ class ImageDataModule(pl.LightningDataModule):
                 self.data_dir, train=False, transform=self.transform
             )
             # print(f'Test set size: {len(self.cifar10_test)}')
-
-        if stage == "predict":
-            self.test_dataset = CIFAR10(self.data_dir, train=False)
-            print(f"Prediction set size: {len(self.cifar10_predict)}")
 
     def _get_train_dataset(self):
         FULL_TRAIN_SIZE = 45000
@@ -182,13 +180,6 @@ class ImageDataModule(pl.LightningDataModule):
             shuffle=False,
         )
 
-    def predict_dataloader(self):
-        return DataLoader(
-            self.test_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-        )
-
 
 if __name__ == "__main__":
 
@@ -196,15 +187,12 @@ if __name__ == "__main__":
 
     dm = ImageDataModule(
         cfg=cfg,
-        data_dir="datasets",
+        data_dir="data/datasets",
     )
     dm.prepare_data()
     dm.setup(stage="fit")
     train_loader = dm.train_dataloader()
 
     for images, labels in train_loader:
-        print(f"Batch of images shape: {images.shape}")
-        print(f"Batch of labels: {labels}")
-        print(f"First image tensor: {images[0]}")
-        print(f"First label: {labels[0]}")
+        print(f"Batch of images shape: {images.shape} {labels.shape}")
         break
