@@ -248,7 +248,7 @@ class ListOpsDataModule(pl.LightningDataModule):
                     value=0,
                 )
 
-            input_tensor = padded_input_ids.float()
+            input_tensor = padded_input_ids.float().unsqueeze(1)
             label_tensor = torch.tensor(labels)
 
             return input_tensor, label_tensor

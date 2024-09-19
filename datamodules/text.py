@@ -22,7 +22,6 @@ from pathlib import Path
 from transformers import AutoTokenizer
 from datasets import load_dataset, DatasetDict
 from omegaconf import OmegaConf
-import re
 import numpy as np
 import nltk
 from nltk.tokenize import word_tokenize
@@ -35,7 +34,7 @@ from torchvision import transforms
 
 class TextDataModule(pl.LightningDataModule):
     """
-    Text Classification Dataset from LRA benchmarks
+    Text Classification Dataset from LRA benchmarks 50000 movie reviews exit positive or negative
     """
 
     def __init__(
@@ -162,7 +161,6 @@ class TextDataModule(pl.LightningDataModule):
             vocab_set.update(examples)  # add tokens to the vocabulary set
         vocab_set.update(self.special_tokens)  # special tokens
         vocab_set = list(set(vocab_set))
-        print(vocab_set)
 
         # encoding
         word_to_number = {word: i + 1 for i, word in enumerate(vocab_set)}
@@ -221,9 +219,6 @@ class TextDataModule(pl.LightningDataModule):
         if stage == "test":
             self.test_dataset = self.dataset["test"]
 
-        if stage == "predict":
-            self.test_dataset = self.dataset["test"]
-
         # batching and padding
         def collate_batch(batch):
             input_ids = [data["Source"] for data in batch]
@@ -247,7 +242,7 @@ class TextDataModule(pl.LightningDataModule):
                     value=0,
                 )
 
-            input_tensor = padded_input_ids.float()
+            input_tensor = padded_input_ids.float().unsqueeze(1)
             label_tensor = torch.tensor(labels)
 
             return input_tensor, label_tensor
@@ -279,14 +274,6 @@ class TextDataModule(pl.LightningDataModule):
             collate_fn=self.collate_fn,
         )
 
-    def predict_dataloader(self):
-        return DataLoader(
-            self.test_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            collate_fn=self.collate_fn,
-        )
-
 
 if __name__ == "__main__":
 
@@ -294,7 +281,6 @@ if __name__ == "__main__":
 
     dm = TextDataModule(
         cfg=cfg,
-        data_dir="datasets",
     )
     dm.prepare_data()
     dm.setup(stage="fit")
