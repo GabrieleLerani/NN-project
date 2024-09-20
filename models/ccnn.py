@@ -3,6 +3,7 @@ import torch
 import pytorch_lightning as pl
 import torch.nn.functional as F
 import torchmetrics
+import torchmetrics.classification
 
 from models.modules import S4Block
 from models.modules import TCNBlock
@@ -95,8 +96,13 @@ class CCNN(pl.LightningModule):
         self.pointwise_linear_layer.layer.bias.data.fill_(value=0.0)
 
         # define metrics
-        self.accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=out_channels)
-        self.f1_score = torchmetrics.F1Score(task="multiclass", num_classes=out_channels)
+        self.train_accuracy = torchmetrics.classification.Accuracy(task="multiclass", num_classes=out_channels)
+        self.val_accuracy = torchmetrics.classification.Accuracy(task="multiclass", num_classes=out_channels)
+        self.test_accuracy = torchmetrics.classification.Accuracy(task="multiclass", num_classes=out_channels)
+
+        self.train_f1_score = torchmetrics.classification.F1Score(task="multiclass", num_classes=out_channels)
+        self.val_f1_score = torchmetrics.classification.F1Score(task="multiclass", num_classes=out_channels)
+        self.test_f1_score = torchmetrics.classification.F1Score(task="multiclass", num_classes=out_channels)
 
     def forward(self, x):
         
@@ -104,35 +110,38 @@ class CCNN(pl.LightningModule):
 
         return out.squeeze()
 
-    # Probably works only for sMNIST
     def training_step(self, batch, batch_idx):
         loss, scores, y = self._common_step(batch, batch_idx)
-        accuracy = self.accuracy(scores, y)
-        f1_score = self.f1_score(scores, y)
+        self.train_accuracy(scores, y)
+        self.train_f1_score(scores, y)
         metrics_dict = {
             'train_loss': loss,
-            'train_accuracy': accuracy,
-            'train_f1_score': f1_score
+            'train_accuracy': self.train_accuracy,
+            'train_f1_score': self.train_f1_score
         }
         self.log_dict(dictionary=metrics_dict, on_step=False, on_epoch=True, prog_bar=True)
         return loss
     
     def validation_step(self, batch, batch_idx):
         loss, scores, y = self._common_step(batch, batch_idx)
+        self.val_accuracy(scores, y)
+        self.val_f1_score(scores, y)
         self.log('val_loss', loss)
-        self.log('accuracy', self.accuracy(scores, y))
+        self.log('val_f1_score', self.val_f1_score)
+        self.log('accuracy', self.val_accuracy)
         return loss
     
     def test_step(self, batch, batch_idx):
         loss, scores, y = self._common_step(batch, batch_idx)
+        self.test_accuracy(scores, y)
+        self.test_f1_score(scores, y)
         
         metrics_dict = {
             'loss': loss,
-            'accuracy': self.accuracy(scores, y),
-            
+            'test_f1_score': self.test_f1_score,
+            'accuracy': self.test_accuracy,
         }
         self.log_dict(metrics_dict)
-        #self.log('accuracy', self.accuracy(scores, y))
         return loss
 
     def predict_step(self, batch, batch_idx, dataloader_idx=None):

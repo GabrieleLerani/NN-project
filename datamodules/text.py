@@ -213,7 +213,11 @@ class TextDataModule(pl.LightningDataModule):
             train_size = total_size - val_size
 
             self.train_dataset, self.val_dataset = random_split(
-                self.dataset["train"], [train_size, val_size]
+                self.dataset["train"],
+                [train_size, val_size],
+                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(
+                    getattr(self, "seed", 42)
+                ),
             )
 
         if stage == "test":
@@ -253,7 +257,7 @@ class TextDataModule(pl.LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=False,
             drop_last=True,
             collate_fn=self.collate_fn,
         )
