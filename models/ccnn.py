@@ -129,6 +129,9 @@ class CCNN(pl.LightningModule):
         self.test_auroc = torchmetrics.classification.AUROC(
             task="multiclass", num_classes=out_channels
         )
+        self.test_roc = torchmetrics.classification.ROC(
+            task="multiclass", num_classes=out_channels
+        )
 
     def forward(self, x):
 
@@ -166,8 +169,11 @@ class CCNN(pl.LightningModule):
         loss, scores, y = self._common_step(batch, batch_idx)
         self.test_accuracy(scores, y)
         self.test_f1_score(scores, y)
-        self.val_confmat(scores, y)
-        self.val_auroc(scores, y)
+        self.test_confmat(scores, y)
+        self.test_auroc(scores, y)
+        self.test_roc(scores, y)
+
+        self.log("test_roc", self.test_roc)
 
         metrics_dict = {
             "loss": loss,
