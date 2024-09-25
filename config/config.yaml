@@ -6,6 +6,7 @@ net:
   no_blocks: 4
   bias: False
   block_type: "s4"
+  causal:  True
 
 kernel:
   kernel_no_layers: 4
@@ -44,7 +45,7 @@ test:
 
 data:
   data_dir : "datasets"
-  dataset : "text"
+  dataset : "s_mnist"
   type: "sequential"
   reduced_dataset: False
   # this line is used only in datamodules that uses LRA as dataset (pathfinder, listops, etc.)
