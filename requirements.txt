@@ -17,3 +17,4 @@ tensorboard
 PySoundFile
 tqdm
 nltk
+seaborn

@@ -102,12 +102,10 @@ def create_trainer(cfg: OmegaConf, logger: TensorBoardLogger, callbacks: list, p
         max_epochs=cfg.train.epochs,
         callbacks=callbacks,
         profiler=profiler,
-        limit_train_batches=10, 
-        limit_val_batches=10
         # TODO used for testing
-        # limit_train_batches=3,
-        # limit_val_batches=3,
-        # limit_test_batches=3
+        limit_train_batches=3,
+        limit_val_batches=3,
+        limit_test_batches=3
     )
 
 def train(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:

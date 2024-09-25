@@ -1,7 +1,7 @@
 import torch
 import unittest
 from .sepflexconv import SepFlexConv
-from ckconv.nn.conv import fftconv, conv as simple_conv
+from ckconv.conv import fftconv, conv as simple_conv
 from omegaconf import OmegaConf
 
 

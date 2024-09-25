@@ -1,7 +1,7 @@
 import torch
 from torch import nn
-from ckconv.nn.ck import MAGNet, create_coordinates, LinearLayer
-from ckconv.nn.conv import fftconv, conv
+from ckconv.ck import MAGNet, create_coordinates, LinearLayer
+from ckconv.conv import fftconv, conv
 
 from omegaconf import OmegaConf
 

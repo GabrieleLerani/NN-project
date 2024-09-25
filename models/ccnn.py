@@ -5,11 +5,14 @@ import torch.nn.functional as F
 import torchmetrics
 import torchmetrics.classification
 import torchmetrics.classification.auroc
+import seaborn as sns
+import matplotlib.pyplot as plt
 
+from sklearn.metrics import confusion_matrix
 from models.modules import S4Block
 from models.modules import TCNBlock
-from ckconv.nn import SepFlexConv
-from ckconv.nn.ck import LinearLayer
+from ckconv import SepFlexConv
+from ckconv.ck import LinearLayer
 from models.modules.utils import GetBatchNormalization
 from models.modules.utils import GetAdaptiveAvgPool
 from omegaconf import OmegaConf
@@ -35,6 +38,10 @@ class CCNN(pl.LightningModule):
         self.epochs = cfg.train.epochs
         self.start_factor = cfg.train.start_factor
         self.end_factor = cfg.train.end_factor
+
+        # Store predictions and labels for confusion matrix
+        self.val_preds = []
+        self.val_labels = []
 
         # separable flexible convolutional layer
         self.sep_flex_conv_layer = SepFlexConv(
@@ -109,32 +116,17 @@ class CCNN(pl.LightningModule):
             task="multiclass", num_classes=out_channels
         )
 
-        self.val_f1_score = torchmetrics.classification.F1Score(
+        self.train_auroc = torchmetrics.classification.AUROC(
             task="multiclass", num_classes=out_channels
         )
-        self.test_f1_score = torchmetrics.classification.F1Score(
-            task="multiclass", num_classes=out_channels
-        )
-
-        self.val_confmat = torchmetrics.classification.ConfusionMatrix(
-            task="multiclass", num_classes=out_channels
-        )
-        self.test_confmat = torchmetrics.classification.ConfusionMatrix(
-            task="multiclass", num_classes=out_channels
-        )
-
         self.val_auroc = torchmetrics.classification.AUROC(
             task="multiclass", num_classes=out_channels
         )
         self.test_auroc = torchmetrics.classification.AUROC(
             task="multiclass", num_classes=out_channels
         )
-        self.test_roc = torchmetrics.classification.ROC(
-            task="multiclass", num_classes=out_channels
-        )
 
     def forward(self, x):
-
         out = self.seq_modules(x)
 
         return out.squeeze()
@@ -153,14 +145,15 @@ class CCNN(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         loss, scores, y = self._common_step(batch, batch_idx)
+
+        # Store predictions and labels for confusion matrix
+        self.val_preds.append(scores.argmax(dim=1))
+        self.val_labels.append(y)
+        
         self.val_accuracy(scores, y)
-        self.val_f1_score(scores, y)
-        self.val_confmat(scores, y)
         self.val_auroc(scores, y)
         self.log("val_loss", loss)
-        self.log("val_f1_score", self.val_f1_score)
         self.log("accuracy", self.val_accuracy)
-        self.log("val_confmat", self.val_confmat)
         self.log("val_auroc", self.val_auroc)
 
         return loss
@@ -168,17 +161,10 @@ class CCNN(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         loss, scores, y = self._common_step(batch, batch_idx)
         self.test_accuracy(scores, y)
-        self.test_f1_score(scores, y)
-        self.test_confmat(scores, y)
         self.test_auroc(scores, y)
-        self.test_roc(scores, y)
-
-        self.log("test_roc", self.test_roc)
 
         metrics_dict = {
             "loss": loss,
-            "test_f1_score": self.test_f1_score,
-            "test_confmat": self.test_confmat,
             "test_auroc": self.test_auroc,
             "accuracy": self.test_accuracy,
         }
@@ -190,6 +176,32 @@ class CCNN(pl.LightningModule):
         scores = self.seq_modules(x).squeeze()
         preds = torch.argmax(scores, dim=1)
         return preds
+    
+    def on_validation_epoch_end(self):
+        val_preds = torch.cat(self.val_preds)
+        val_labels = torch.cat(self.val_labels)
+
+        # Compute confusion matrix
+        cm = confusion_matrix(val_labels.cpu().numpy(), val_preds.cpu().numpy())
+        
+        # Plot confusion matrix
+        self.plot_confusion_matrix(cm)
+
+        # Clear stored predictions and labels for the next epoch
+        self.val_preds.clear()
+        self.val_labels.clear()
+        
+
+    def plot_confusion_matrix(self, cm):
+        fig, ax = plt.subplots(figsize=(10, 8))
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
+        ax.set_xlabel("Predicted labels")
+        ax.set_ylabel("True labels")
+        ax.set_title("Confusion Matrix")
+
+        # Log confusion matrix to TensorBoard
+        self.logger.experiment.add_figure("Confusion Matrix", fig, self.current_epoch)
+        plt.close(fig)
 
     def _common_step(self, batch, batch_idx):
         x, y = batch
