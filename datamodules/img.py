@@ -44,7 +44,7 @@ class ImageDataModule(pl.LightningDataModule):
         self.val_split = 0.1
 
         # Determine data_type
-        self.type = cfg.data.type
+        self.type = cfg.data.dataset
         self.cfg = cfg
 
         self._yaml_parameters()
@@ -63,7 +63,7 @@ class ImageDataModule(pl.LightningDataModule):
                 transforms.Lambda(lambda x: x / 255.0),
             ]
         )
-        if self.type == "sequential":
+        if self.type == "s_image":
             self.transform.transforms.append(
                 transforms.Lambda(lambda x: x.view(1, -1))
             )  # flatten the image to 1024 pixels
@@ -78,14 +78,14 @@ class ImageDataModule(pl.LightningDataModule):
 
         if hidden_channels == 140:
 
-            if self.type == "default":
+            if self.type == "image":
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2085.43)
                 OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
 
-            elif self.type == "sequential":
+            elif self.type == "s_image":
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.weight_decay", 0)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
@@ -95,12 +95,12 @@ class ImageDataModule(pl.LightningDataModule):
         elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
 
-            if self.type == "default":
+            if self.type == "image":
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2306.08)
-            elif self.type == "sequential":
+            elif self.type == "s_image":
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)

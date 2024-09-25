@@ -18,6 +18,7 @@ def get_data_module(cfg: OmegaConf):
         "pathfinder",
         "listops",
         "image",
+        "s_image",
         "text",
     ], "Dataset not supported"
     assert not (
