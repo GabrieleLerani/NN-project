@@ -6,6 +6,7 @@ net:
   no_blocks: 4
   bias: False
   block_type: "s4"
+  causal:  True
 
 kernel:
   kernel_no_layers: 4

@@ -60,7 +60,7 @@ class SepFlexConv(nn.Module):
         self.data_dim = data_dim
         self.in_channels = in_channels
         hidden_channels = net_cfg.hidden_channels
-    
+
         
         # kernel parameters
         kernel_no_layers = kernel_cfg.kernel_no_layers
@@ -80,6 +80,8 @@ class SepFlexConv(nn.Module):
         else :
             self.bias = None
 
+        # causal
+        self.causal = net_cfg.causal
 
         # init gaussian mask parameter
         self.mask_mean = torch.nn.Parameter(torch.zeros(data_dim)) # mi = 0
@@ -222,7 +224,7 @@ class SepFlexConv(nn.Module):
         if self.conv_type == "fftconv" and torch.all(size > self.fft_threshold):
             out = fftconv(x=x, kernel=self.masked_kernel, bias=self.bias)
         else:
-            out = conv(x=x, kernel=self.masked_kernel, bias=self.bias)
+            out = conv(x=x, kernel=self.masked_kernel, bias=self.bias, causal = self.causal)
 
         # pointwise convolution where out is the spatial convolution
         out = self.pointwise_conv(out)

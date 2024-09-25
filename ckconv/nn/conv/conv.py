@@ -57,6 +57,7 @@ def conv(
     x: torch.Tensor,
     kernel: torch.Tensor,
     bias: Optional[torch.Tensor] = None,
+    causal: bool = False,
 ):
 
     data_dim = len(x.shape) - 2
@@ -70,10 +71,16 @@ def conv(
     padding = (kernel_size // 2).tolist() 
 
     groups = kernel.shape[1]
+
+    if causal:
+        # pad the input to the left
+        x = F.pad(x, [kernel.shape[-1] - 1, 0], value=0.0)
+
     # invert first two dimensions of kernel because there should be one kernel per input channel
     kernel = kernel.view(kernel.shape[1], 1, *kernel.shape[2:])
 
-    return get_conv_function(x, kernel, bias, padding=padding, groups=groups, dim=data_dim)
+
+    return get_conv_function(x, kernel, bias, padding=0 if causal else padding, groups=groups, dim=data_dim)
 
 
 
