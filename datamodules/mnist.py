@@ -41,7 +41,7 @@ class MnistDataModule(L.LightningDataModule):
         hidden_channels = self.cfg.net.hidden_channels
 
         OmegaConf.update(self.cfg, "train.batch_size", 100)
-        OmegaConf.update(self.cfg, "train.epochs", 3)
+        OmegaConf.update(self.cfg, "train.epochs", 210)
         OmegaConf.update(self.cfg, "net.in_channels", 1)
         OmegaConf.update(self.cfg, "net.out_channels", 10)
         OmegaConf.update(self.cfg, "net.data_dim", 1)
