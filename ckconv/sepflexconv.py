@@ -9,9 +9,9 @@ from omegaconf import OmegaConf
 class SepFlexConv(nn.Module):
     """
     SeparableFlexConv (SepFlexConv) is a depthwise separable version of FlexConv (Romero et al., 2022a)
-    
+
     ConstructMaskedKernel outputs a continuous version of the kernel which is multiplied by a Gaussian mask.
-    
+
     The gaussian mask has learnable parameters and by learning it the model can learn the size of the convolutional kernel.
 
     The flow is the following:
@@ -20,10 +20,10 @@ class SepFlexConv(nn.Module):
             |
             |
             |
-            -------------- | 
+            -------------- |
             |              |input.length
             |              |
-            |    ConstructMaskedKernel   
+            |    ConstructMaskedKernel
             |              |
             |              |
             SpatialConvolution
@@ -38,7 +38,7 @@ class SepFlexConv(nn.Module):
         data_dim: int,
         in_channels: int,
         net_cfg: OmegaConf,
-        kernel_cfg: OmegaConf, 
+        kernel_cfg: OmegaConf,
     ):
         """
         Initializes the CKConv module.
@@ -61,42 +61,42 @@ class SepFlexConv(nn.Module):
         self.in_channels = in_channels
         hidden_channels = net_cfg.hidden_channels
 
-        
         # kernel parameters
         kernel_no_layers = kernel_cfg.kernel_no_layers
         kernel_hidden_channels = kernel_cfg.kernel_hidden_channels
         self.kernel_size = kernel_cfg.kernel_size
         self.conv_type = kernel_cfg.conv_type
         self.fft_threshold = kernel_cfg.fft_threshold
-        
 
         # init relative positions of the kernel
         self.kernel_positions = torch.zeros(1)
+        # init the intervals num between kernels positions
+        self.positions_intervals_num = 32
+        self.linspace_stepsize = torch.zeros(1)
 
         if net_cfg.bias:
             # init random bias with in_channels dimensions
             self.bias = torch.randn(in_channels)
             self.bias.data.fill_(0.0)
-        else :
+        else:
             self.bias = None
 
         # causal
         self.causal = net_cfg.causal
 
         # init gaussian mask parameter
-        self.mask_mean = torch.nn.Parameter(torch.zeros(data_dim)) # mi = 0
-        self.mask_sigma = torch.nn.Parameter(torch.ones(data_dim)) # sigma = 1
+        self.mask_mean = torch.nn.Parameter(torch.zeros(data_dim))  # mi = 0
+        self.mask_sigma = torch.nn.Parameter(torch.ones(data_dim))  # sigma = 1
 
-    
         # Define the kernel net, in our case always a MAGNet
         self.KernelNet = MAGNet(
             data_dim=data_dim,
             hidden_channels=kernel_hidden_channels,
-            out_channels=in_channels, # always in channel because separable
+            out_channels=in_channels,  # always in channel because separable
             no_layers=kernel_no_layers,
             omega_0=kernel_cfg.omega_0,
         )
-        
+
         # Define the pointwise convolution layer (page 4 original paper)
         self.pointwise_conv = LinearLayer(
             dim=data_dim,
@@ -104,7 +104,29 @@ class SepFlexConv(nn.Module):
             out_channels=hidden_channels,
             bias=net_cfg.bias,
         )
-        
+
+        # dynamic cropping
+        self.mask_width_param = torch.Tensor([0.075])
+        self.mask_mean_param = torch.Tensor([1.0])
+        self.mask_threshold = 1.0 * torch.ones(1)
+        self.mask_mean_param = torch.nn.Parameter(self.mask_mean_param)
+        self.mask_width_param = torch.nn.Parameter(self.mask_width_param)
+
+    def crop_kernel_positions_causal(
+        self,
+        kernel_pos: torch.Tensor,
+        root: float,
+    ):
+        # In 1D, only one part of the array must be cut.
+        if abs(root) >= 1.0:
+            return kernel_pos
+        else:
+            # We not find the index from which the positions must be cropped
+            # index = value - initial_linspace_value / step_size
+            index = (
+                torch.floor((root + 1.0) / self.linspace_stepsize).int().item()
+            )  # TODO: zero?
+            return kernel_pos[..., index:]
 
     def construct_masked_kernel(self, x):
         """
@@ -112,14 +134,14 @@ class SepFlexConv(nn.Module):
         gaussian mask.
 
         input.length
-        | 
-        GetRelPositions             
-        RelPositions             
-        |     
-        KernelNet          
-        ConvKernel               
-        |             
-        GaussMask                  
+        |
+        GetRelPositions
+        RelPositions
+        |
+        KernelNet
+        ConvKernel
+        |
+        GaussMask
         |
         MaskedKernel
         """
@@ -127,20 +149,31 @@ class SepFlexConv(nn.Module):
         # 1. Get the relative positions
         kernel_positions = self.get_rel_positions(x)
 
+        # 1.1 dynamic cropping
+        with torch.no_grad():
+            roots = gaussian_min_root(
+                thresh=self.mask_threshold,
+                mean=self.mask_mean_param,
+                sigma=self.mask_width_param,
+            )
+            kernel_positions = self.crop_kernel_positions_causal(
+                kernel_positions, roots
+            )
+
         # 2 Re-weight the output layer of the kernel net
-        self.KernelNet.re_weight_output_layer(kernel_positions, self.in_channels, self.data_dim)
+        self.KernelNet.re_weight_output_layer(
+            kernel_positions, self.in_channels, self.data_dim
+        )
 
         # 3. Get the kernel
-        conv_kernel = self.KernelNet(kernel_positions) 
+        conv_kernel = self.KernelNet(kernel_positions)
 
         # 4. Get the mask gaussian mask
         mask = self.gaussian_mask(
             kernel_pos=kernel_positions,
-            mask_mean=self.mask_mean,  
+            mask_mean=self.mask_mean,
             mask_sigma=self.mask_sigma,
         )
-
-        
 
         return conv_kernel * mask
 
@@ -153,7 +186,7 @@ class SepFlexConv(nn.Module):
         ):  # The conv. receives input signals of length > 1
 
             # Creates the vector of relative positions
-            
+
             kernel_positions = create_coordinates(
                 kernel_size=self.kernel_size,
                 data_dim=self.data_dim,
@@ -167,18 +200,17 @@ class SepFlexConv(nn.Module):
             # Save the step size for the calculation of dynamic cropping
             # The step is max - min / (no_steps - 1)
             # TODO : Check cropping
-            # self.linspace_stepsize = (
-            #     (1.0 - (-1.0)) / (self.train_length[0] - 1)
-            # ).type_as(self.linspace_stepsize)
+            self.linspace_stepsize = (
+                (1.0 - (-1.0)) / (self.positions_intervals_num)
+            )
         return self.kernel_positions
 
     def gaussian_mask(
-            self,
-            kernel_pos: torch.Tensor,
-            mask_mean: torch.Tensor,
-            mask_sigma: torch.Tensor
-        ) -> torch.Tensor:
-        
+        self,
+        kernel_pos: torch.Tensor,
+        mask_mean: torch.Tensor,
+        mask_sigma: torch.Tensor,
+    ) -> torch.Tensor:
         """
         Generates a Gaussian mask based on the given parameters.
         Args:
@@ -187,22 +219,22 @@ class SepFlexConv(nn.Module):
             mask_sigma (torch.Tensor): The standard deviation of the mask.
             Returns:
                 torch.Tensor: The generated Gaussian mask of [1, 1, Y, X] in 2D or [1, 1, X] in 1D
-        
+
         Example 2D:
-            if kernel_pos.shape = [1, 2, 33, 33] and mask_mean.shape = [1, 2] 
+            if kernel_pos.shape = [1, 2, 33, 33] and mask_mean.shape = [1, 2]
             in order to sum them you need to reshape mask_mean to [1, 2, 1, 1]
             Then you sum over the first dimension and the output will be [1, 1, 33, 33]
         """
-        
+
         # reshape the mask_mean and mask_sigma so that they can be broadcasted
         mask_mean = mask_mean.view(1, self.data_dim, *(1,) * self.data_dim)
         mask_sigma = mask_sigma.view(1, self.data_dim, *(1,) * self.data_dim)
-        
+
         return torch.exp(
             -0.5
-            * (
-                1.0 / (mask_sigma**2) * (kernel_pos - mask_mean) ** 2
-            ).sum(1, keepdim=True)
+            * (1.0 / (mask_sigma**2) * (kernel_pos - mask_mean) ** 2).sum(
+                1, keepdim=True
+            )
         )
 
     def forward(self, x):
@@ -216,17 +248,38 @@ class SepFlexConv(nn.Module):
             3. spatial convolution between x and masked kernel -> [64, 140, 32, 32]
             4. Pointwise convolution -> [64, 140, 32, 32]
         """
-        
+
         self.masked_kernel = self.construct_masked_kernel(x)
-        
-        size = torch.tensor(self.masked_kernel.shape[2:]) # -> [33,33] for data_dim=2
+
+        size = torch.tensor(self.masked_kernel.shape[2:])  # -> [33,33] for data_dim=2
         # fftconv is used when the size of the kernel is large enough
         if self.conv_type == "fftconv" and torch.all(size > self.fft_threshold):
             out = fftconv(x=x, kernel=self.masked_kernel, bias=self.bias)
         else:
-            out = conv(x=x, kernel=self.masked_kernel, bias=self.bias, causal = self.causal)
+            out = conv(
+                x=x, kernel=self.masked_kernel, bias=self.bias, causal=self.causal
+            )
 
         # pointwise convolution where out is the spatial convolution
         out = self.pointwise_conv(out)
-    
+
         return out
+
+
+# dynamic cropping
+def gaussian_min_root(
+    thresh: float,
+    mean: float,
+    sigma: float,
+):
+    return torch.min(gaussian_inv_thresh(thresh, mean, sigma))
+
+
+def gaussian_inv_thresh(
+    thresh: float,
+    mean: float,
+    sigma: float,
+):
+    # Based on the threshold value, compute the value of the roots
+    aux = sigma * torch.sqrt(-2.0 * torch.log(thresh))
+    return torch.stack([mean - aux, mean + aux], dim=1)

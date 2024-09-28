@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 import pytorch_lightning as pl
 from torch.utils.data import random_split
+from collections import Counter
 
 
 from datasets import load_dataset, DatasetDict
@@ -47,14 +48,15 @@ class TextDataModule(pl.LightningDataModule):
 
         # Save parameters to self
         self.data_dir = Path(data_dir) / "IMDB"
-        self.num_workers = 7
+        self.num_workers = 1
         self.batch_size = cfg.train.batch_size
         self.serialized_dataset_path = os.path.join(
             self.data_dir, "preprocessed_dataset_imdb"
         )
 
-        self.tokenizer_type = "word"
-        self.special_tokens = ["<unk>", "<bos>", "<eos>"]
+        self.tokenizer_type = "char"
+        self.special_tokens = ["<unk>", "<bos>", "<eos>", "<pad>"]
+
         self.max_length = 4096
         self.val_split = 0.1
 
@@ -121,7 +123,7 @@ class TextDataModule(pl.LightningDataModule):
         """
 
         def adapt_example(example):
-            return {"Source": example["text"], "Target": example["label"]}
+            return {"Source": example["text"].lower(), "Target": example["label"]}
 
         for split in ["train", "test"]:
 
@@ -151,6 +153,8 @@ class TextDataModule(pl.LightningDataModule):
 
         lengths = []
         vocab_set = set()
+        vocab_list = []
+
         for i, data in enumerate(self.dataset["train"]):
             examples = tokenizer(data)
             examples = examples["Source"]
@@ -158,18 +162,43 @@ class TextDataModule(pl.LightningDataModule):
                 examples, (-1)
             ).tolist()  # flatten and convert to list
             lengths.append(len(examples))  # track the number of tokens
+            vocab_list.extend(examples)
             vocab_set.update(examples)  # add tokens to the vocabulary set
         vocab_set.update(self.special_tokens)  # special tokens
         vocab_set = list(set(vocab_set))
+        token_counts = Counter(vocab_list)
 
         # encoding
-        word_to_number = {word: i + 1 for i, word in enumerate(vocab_set)}
+        word_to_number = {
+            word: i + 1
+            for i, word in enumerate(vocab_set)
+            if token_counts[word] >= 20 or word in self.special_tokens
+        }
+
+        print(len(word_to_number))
+        # # normalization
+        # self.max_vocab_value = len(vocab_set)
+        # word_to_number = {
+        #     word: (value - 1) / (self.max_vocab_value - 1)
+        #     for word, value in word_to_number.items()
+        # }
+
+        # print(vocab_set)
 
         def encode_tokens(input):
             tokens = input["Source"]
-            encoded_tokens = [
-                word_to_number[token] for token in tokens if token in word_to_number
-            ]
+            encoded_tokens = (
+                [word_to_number["<bos>"]]
+                + [
+                    (
+                        word_to_number[token]
+                        if token in word_to_number
+                        else word_to_number["<unk>"]
+                    )
+                    for token in tokens
+                ]
+                + [word_to_number["<eos>"]]
+            )
             return {"Source": encoded_tokens, "Target": input["Target"]}
 
         for split in ["train", "test"]:
@@ -290,6 +319,7 @@ if __name__ == "__main__":
     dm.setup(stage="fit")
     train_loader = dm.train_dataloader()
 
+    max_len = 0
+
     for images, labels in train_loader:
-        print(f"Batch of images shape: {images.shape} {labels.shape}")
         break
