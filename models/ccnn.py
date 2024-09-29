@@ -237,7 +237,7 @@ class CCNN(pl.LightningModule):
         # Combine the warm-up and cosine annealing using ChainedScheduler
         # ChainedScheduler applies both the schedulers at the same time
         # SequentialLR applies one scheduler at a time
-        scheduler = optim.lr_scheduler.ChainedScheduler([linear_warmup, cosine_scheduler])
+        scheduler = optim.lr_scheduler.SequentialLR(optimizer=optimizer, schedulers=[linear_warmup, cosine_scheduler], milestones=[self.warmup_epochs])
 
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
