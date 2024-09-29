@@ -85,8 +85,11 @@ class SepFlexConv(nn.Module):
         self.causal = net_cfg.causal
 
         # init gaussian mask parameter
-        self.mask_mean = torch.nn.Parameter(torch.zeros(data_dim))  # mi = 0
-        self.mask_sigma = torch.nn.Parameter(torch.ones(data_dim))  # sigma = 1
+        self.mask_mean_param = torch.zeros(data_dim)
+        self.mask_width_param = torch.Tensor([0.075] * data_dim)
+
+        self.mask_mean_param = torch.nn.Parameter(self.mask_mean_param)
+        self.mask_width_param = torch.nn.Parameter(self.mask_width_param)
 
         # Define the kernel net, in our case always a MAGNet
         self.KernelNet = MAGNet(
@@ -171,8 +174,8 @@ class SepFlexConv(nn.Module):
         # 4. Get the mask gaussian mask
         mask = self.gaussian_mask(
             kernel_pos=kernel_positions,
-            mask_mean=self.mask_mean,
-            mask_sigma=self.mask_sigma,
+            mask_mean=self.mask_mean_param,
+            mask_sigma=self.mask_width_param,
         )
 
         return conv_kernel * mask
@@ -232,7 +235,7 @@ class SepFlexConv(nn.Module):
 
         return torch.exp(
             -0.5
-            * (1.0 / (mask_sigma**2) * (kernel_pos - mask_mean) ** 2).sum(
+            * (1.0 / (mask_sigma ** 2) * (kernel_pos - mask_mean) ** 2).sum(
                 1, keepdim=True
             )
         )
