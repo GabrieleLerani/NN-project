@@ -79,9 +79,7 @@ def conv(
     # invert first two dimensions of kernel because there should be one kernel per input channel
     kernel = kernel.view(kernel.shape[1], 1, *kernel.shape[2:])
 
-
     return get_conv_function(x, kernel, bias, padding=0 if causal else padding, groups=groups, dim=data_dim)
-
 
 
 def fftconv(

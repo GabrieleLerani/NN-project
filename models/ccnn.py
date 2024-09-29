@@ -213,7 +213,7 @@ class CCNN(pl.LightningModule):
     def configure_optimizers(self):
         # Define the optimizer (AdamW)
         optimizer = optim.AdamW(
-            params=self.seq_modules.parameters(),
+            params=self.parameters(),
             lr=self.learning_rate,
             weight_decay=self.weight_decay
         )

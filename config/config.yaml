@@ -9,7 +9,7 @@ net:
   causal: True
 
 kernel:
-  kernel_no_layers: 4
+  kernel_no_layers: 3
   kernel_hidden_channels: 32
   kernel_size: 33
   conv_type: "conv"
