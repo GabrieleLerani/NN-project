@@ -34,6 +34,7 @@ class CCNN(pl.LightningModule):
         hidden_channels = cfg.net.hidden_channels
 
         self.learning_rate = cfg.train.learning_rate
+        self.weight_decay = cfg.train.weight_decay
         self.warmup_epochs = cfg.train.warmup_epochs
         self.epochs = cfg.train.epochs
         self.start_factor = cfg.train.start_factor
@@ -211,7 +212,7 @@ class CCNN(pl.LightningModule):
 
     def configure_optimizers(self):
         # Define the optimizer (AdamW)
-        optimizer = optim.AdamW(self.parameters(), lr=self.learning_rate)
+        optimizer = optim.AdamW(self.parameters(), lr=self.learning_rate,weight_decay=self.weight_decay)
 
         # Define the linear learning rate warm-up for 10 epochs
         linear_warmup = optim.lr_scheduler.LinearLR(
