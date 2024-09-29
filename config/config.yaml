@@ -30,7 +30,7 @@ train:
   epochs: 210
   learning_rate: 0.01
   batch_size: 10
-  start_factor: 1e-6
+  start_factor: 1e-8
   end_factor: 1.0
   dropout_rate: 10
   weight_decay: 1e-4
@@ -42,7 +42,7 @@ test:
 
 data:
   data_dir : "datasets"
-  dataset : "text"
+  dataset : "p_mnist"
   reduced_dataset: False
   # this line is used only in datamodules that uses LRA as dataset (pathfinder, listops, etc.)
   light_lra: False

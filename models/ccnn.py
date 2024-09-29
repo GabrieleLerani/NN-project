@@ -38,6 +38,7 @@ class CCNN(pl.LightningModule):
         self.epochs = cfg.train.epochs
         self.start_factor = cfg.train.start_factor
         self.end_factor = cfg.train.end_factor
+        self.weight_decay = cfg.train.weight_decay
 
         # Store predictions and labels for confusion matrix
         self.val_preds = []
@@ -211,7 +212,11 @@ class CCNN(pl.LightningModule):
 
     def configure_optimizers(self):
         # Define the optimizer (AdamW)
-        optimizer = optim.AdamW(self.parameters(), lr=self.learning_rate)
+        optimizer = optim.AdamW(
+            params=self.seq_modules.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay
+        )
 
         # Define the linear learning rate warm-up for 10 epochs
         linear_warmup = optim.lr_scheduler.LinearLR(
@@ -223,15 +228,15 @@ class CCNN(pl.LightningModule):
 
         # Define the cosine annealing scheduler
         cosine_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=(self.epochs - self.warmup_epochs)
+            optimizer=optimizer,
+            T_max=(self.epochs - self.warmup_epochs),
+            last_epoch=-self.warmup_epochs
         )
 
-        # Combine the warm-up and cosine annealing using SequentialLR
-        scheduler = optim.lr_scheduler.SequentialLR(
-            optimizer,
-            schedulers=[linear_warmup, cosine_scheduler],
-            milestones=[self.warmup_epochs],
-        )
+        # Combine the warm-up and cosine annealing using ChainedScheduler
+        # ChainedScheduler applies both the schedulers at the same time
+        # SequentialLR applies one scheduler at a time
+        scheduler = optim.lr_scheduler.ChainedScheduler([linear_warmup, cosine_scheduler])
 
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
 

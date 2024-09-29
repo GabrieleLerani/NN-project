@@ -32,7 +32,6 @@ class MnistDataModule(L.LightningDataModule):
                 ),  # flatten the image to 784 pixels
             ]
         )
-
     
         if self.type == "p_mnist":        
             self.permutation = torch.randperm(784)
@@ -125,7 +124,6 @@ class MnistDataModule(L.LightningDataModule):
         print(f"Validation set size: {len(mnist_val)}")
         return mnist_train, mnist_val
         
-        
 
     def train_dataloader(self):
         return DataLoader(
@@ -161,7 +159,7 @@ class MnistDataModule(L.LightningDataModule):
 
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
         if self.type == "p_mnist":
-            # apply permutation 
+            # apply permutation
             x, y = batch
             if x.device != self.permutation.device: # Check if devices match
                 self.permutation = self.permutation.to(x.device) # Move permutation to the same device as x
