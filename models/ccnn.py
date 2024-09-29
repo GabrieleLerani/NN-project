@@ -34,6 +34,7 @@ class CCNN(pl.LightningModule):
         hidden_channels = cfg.net.hidden_channels
 
         self.learning_rate = cfg.train.learning_rate
+        self.weight_decay = cfg.train.weight_decay
         self.warmup_epochs = cfg.train.warmup_epochs
         self.epochs = cfg.train.epochs
         self.start_factor = cfg.train.start_factor
