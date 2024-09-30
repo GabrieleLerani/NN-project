@@ -30,7 +30,7 @@ class MFN(nn.Module):
                     out_channels=hidden_channels,
                     bias=True,
                 )
-                for _ in range(no_layers - 1)
+                for _ in range(no_layers)
             ]
         )
 
@@ -153,7 +153,6 @@ class AnisotropicGaborLayer(nn.Module):
                 for _ in range(data_dim)
             ]
         )
-
         
         scaling_factor = 25.6
 

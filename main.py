@@ -6,7 +6,7 @@ from omegaconf import OmegaConf
 from models import CCNN
 from datamodules import get_data_module
 from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, ModelSummary, LearningRateMonitor
 from pytorch_lightning.profilers import PyTorchProfiler
 import os
 
@@ -18,6 +18,10 @@ def main(cfg: OmegaConf) -> None:
 
     # 1. Create the dataset
     datamodule = get_data_module(cfg)
+
+    cfg.train.iters_per_train_epoch = (
+        len(datamodule.train_dataset) // cfg.train.batch_size
+    )
     
     print("################# Received configuration: #################")
     print(OmegaConf.to_yaml(cfg))
@@ -30,7 +34,6 @@ def main(cfg: OmegaConf) -> None:
 
     # 4. Train the model or use a pretrained one
     train(cfg, trainer, model, datamodule)
-    
     
 
 def create_model(cfg: OmegaConf) -> CCNN:
@@ -82,7 +85,10 @@ def setup_trainer_components(cfg: OmegaConf):
         kernel_logger_callback = KernelLogger(
             filename
         )
-        callbacks.extend([kernel_logger_callback, model_summary_callback, checkpoint_top_callback, checkpoint_last_callback, early_stop_callback])
+        learning_rate_callback = LearningRateMonitor(
+            logging_interval='step'
+        )
+        callbacks.extend([kernel_logger_callback, model_summary_callback, checkpoint_top_callback, checkpoint_last_callback, early_stop_callback, learning_rate_callback])
 
     # Setup profiler
     profiler = None
@@ -110,13 +116,13 @@ def create_trainer(cfg: OmegaConf, logger: TensorBoardLogger, callbacks: list, p
 
 def train(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:
     if not cfg.load_model.pre_trained or not exists_checkpoint_path(cfg):
-        trainer.fit(model, datamodule)
+        trainer.fit(model=model, datamodule=datamodule)
     # Load the model from a checkpoint
     else:
-        trainer.fit(model=model, train_dataloaders=datamodule, ckpt_path=get_checkpoint_path(cfg))
+        trainer.fit(model=model, datamodule=datamodule, ckpt_path=get_checkpoint_path(cfg))
 
-    trainer.validate(model, datamodule)
-    trainer.test(model, datamodule)
+    trainer.validate(model=model, datamodule=datamodule)
+    trainer.test(model=model, datamodule=datamodule)
 
 def get_checkpoint_path(cfg: OmegaConf) -> str:
     filename = f"{cfg.data.dataset}_{cfg.net.no_blocks}_{cfg.net.hidden_channels}"
