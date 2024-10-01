@@ -18,10 +18,6 @@ def main(cfg: OmegaConf) -> None:
 
     # 1. Create the dataset
     datamodule = get_data_module(cfg)
-
-    cfg.train.iters_per_train_epoch = (
-        len(datamodule.train_dataset) // cfg.train.batch_size
-    )
     
     print("################# Received configuration: #################")
     print(OmegaConf.to_yaml(cfg))
@@ -109,9 +105,9 @@ def create_trainer(cfg: OmegaConf, logger: TensorBoardLogger, callbacks: list, p
         callbacks=callbacks,
         profiler=profiler,
         # TODO used for testing
-        limit_train_batches=30,
-        limit_val_batches=30,
-        limit_test_batches=30
+        #limit_train_batches=30,
+        #limit_val_batches=30,
+        #limit_test_batches=30
     )
 
 def train(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:

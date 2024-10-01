@@ -2,9 +2,7 @@ import torch
 from torch import nn
 from ckconv.ck import MAGNet, create_coordinates, LinearLayer
 from ckconv.conv import fftconv, conv
-
 from omegaconf import OmegaConf
-
 
 class SepFlexConv(nn.Module):
     """
@@ -85,11 +83,12 @@ class SepFlexConv(nn.Module):
         self.causal = net_cfg.causal
 
         # init gaussian mask parameter
-        self.mask_mean_param = torch.zeros(data_dim)
-        self.mask_width_param = torch.Tensor([0.075] * data_dim)
+        mask_mean_param = torch.ones(data_dim)
+        mask_width_param = torch.Tensor([0.075] * data_dim)
 
-        self.mask_mean_param = torch.nn.Parameter(self.mask_mean_param)
-        self.mask_width_param = torch.nn.Parameter(self.mask_width_param)
+        # self.mask_mean_param = torch.nn.Parameter(mask_mean_param)
+        self.register_buffer("mask_mean_param", mask_mean_param)
+        self.mask_width_param = torch.nn.Parameter(mask_width_param)
 
         # Define the kernel net, in our case always a MAGNet
         self.KernelNet = MAGNet(
