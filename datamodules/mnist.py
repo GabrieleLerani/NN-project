@@ -24,6 +24,7 @@ class MnistDataModule(L.LightningDataModule):
         MNIST(self.data_dir, train=False, download=True)
 
     def _set_transform(self):
+
         self.transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -31,15 +32,14 @@ class MnistDataModule(L.LightningDataModule):
                 transforms.Lambda(
                     lambda x: x.view(1, -1)
                 ),  # flatten the image to 784 pixels
-                 transforms.Lambda(
-                    lambda x: x[:,self.permutation]  # fixed permutation
-                ),
             ]
         )
-    
-        if self.type == "p_mnist":        
-            self.permutation = self._generate_permutation()  # Generate a fixed permutation
 
+        if self.type == "p_mnist":   
+            self.permutation = self._generate_permutation()  # Generate a fixed permutation     
+            self.transform.transforms.append(transforms.Lambda(
+                        lambda x: x[:,self.permutation]  # fixed permutation
+                    ))
 
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
