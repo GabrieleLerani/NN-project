@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 from omegaconf import OmegaConf
 from typing import Tuple
 import numpy as np
+import random
 
 class MnistDataModule(L.LightningDataModule):
-    def __init__(self, cfg, data_dir: str = "datasets"):
+    def __init__(self, cfg:OmegaConf, data_dir: str = "datasets"):
         super().__init__()
         self.data_dir = data_dir
         self.type = cfg.data.dataset
@@ -30,11 +31,15 @@ class MnistDataModule(L.LightningDataModule):
                 transforms.Lambda(
                     lambda x: x.view(1, -1)
                 ),  # flatten the image to 784 pixels
+                 transforms.Lambda(
+                    lambda x: x[:,self.permutation]  # fixed permutation
+                ),
             ]
         )
     
         if self.type == "p_mnist":        
-            self.permutation = torch.randperm(784)
+            self.permutation = self._generate_permutation()  # Generate a fixed permutation
+
 
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
@@ -157,31 +162,71 @@ class MnistDataModule(L.LightningDataModule):
             shuffle=False,
         )
 
-    def on_before_batch_transfer(self, batch, dataloader_idx: int):
-        if self.type == "p_mnist":
-            # apply permutation
-            x, y = batch
-            if x.device != self.permutation.device: # Check if devices match
-                self.permutation = self.permutation.to(x.device) # Move permutation to the same device as x
-            x = x[:, :, self.permutation]
-            batch = x, y
-        return batch
+    # def on_before_batch_transfer(self, batch, dataloader_idx: int):
+    #     if self.type == "p_mnist":
+    #         # apply permutation
+    #         x, y = batch
+    #         if x.device != self.permutation.device: # Check if devices match
+    #             self.permutation = self.permutation.to(x.device) # Move permutation to the same device as x
+    #         x = x[:, :, self.permutation]
+    #         batch = x, y
+    #     return batch
 
 
     def show_samples(self, num_samples: int = 5):
         dataset = self.mnist_full
-        fig, axes = plt.subplots(1, num_samples, figsize=(15, 3))
         for i in range(num_samples):
             image, label = dataset[i]
-            # image = image.permute(1, 2, 0)  # Convert from (C, H, W) to (H, W, C)
-            axes[i].imshow(image)
-            axes[i].set_title(f"Label: {label}")
-            axes[i].axis("off")
+            # Create the plot
+            plt.figure(figsize=(10,10))  # Wide plot to fit 784 pixels
+            plt.plot(image, marker='o', markersize=20, linestyle='-',)
+            
+            # Add title and labels
+            plt.title(f"Flattened Image of Label: {label}")
+    
+ 
         plt.show()
 
 
+    def _generate_permutation(self):
+        random.seed(42)
+        np.random.seed(42)  # To ensure numpy operations are also reproducible
+        permutation = np.random.permutation(784)
+        return permutation
+
+
 if __name__ == "__main__":
-    mnist = MnistDataModule("datasets", 32)
+    cfg = OmegaConf.load("config/config.yaml")
+
+    mnist = MnistDataModule(cfg=cfg)
+    mnist.prepare_data()
 
     mnist.setup("fit")
-    mnist.show_samples(3)
+    train_loader = mnist.train_dataloader()
+
+    mnist.show_samples(2)
+
+
+    max_len = 0
+
+    for images, labels in train_loader:
+        im=images
+        break
+
+    cfg = OmegaConf.load("config/config.yaml")
+
+    mnist = MnistDataModule(cfg=cfg)
+    mnist.prepare_data()
+
+    mnist.setup("fit")
+    train_loader = mnist.train_dataloader()
+
+
+    max_len = 0
+
+    for images, labels in train_loader:
+        im2=images
+        break
+    print(im==im2)
+        
+    mnist.show_samples(2)
