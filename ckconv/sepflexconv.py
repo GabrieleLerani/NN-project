@@ -107,28 +107,7 @@ class SepFlexConv(nn.Module):
             bias=net_cfg.bias,
         )
 
-        # dynamic cropping
-        # self.mask_width_param = torch.Tensor([0.075])
-        # self.mask_mean_param = torch.Tensor([1.0])
-        # self.mask_threshold = 1.0 * torch.ones(1)
-        # self.mask_mean_param = torch.nn.Parameter(self.mask_mean_param)
-        # self.mask_width_param = torch.nn.Parameter(self.mask_width_param)
 
-    # def crop_kernel_positions_causal(
-    #     self,
-    #     kernel_pos: torch.Tensor,
-    #     root: float,
-    # ):
-    #     # In 1D, only one part of the array must be cut.
-    #     if abs(root) >= 1.0:
-    #         return kernel_pos
-    #     else:
-    #         # We not find the index from which the positions must be cropped
-    #         # index = value - initial_linspace_value / step_size
-    #         index = (
-    #             torch.floor((root + 1.0) / self.linspace_stepsize).int().item()
-    #         )  # TODO: zero?
-    #         return kernel_pos[..., index:]
 
     def construct_masked_kernel(self, x):
         """
@@ -151,16 +130,6 @@ class SepFlexConv(nn.Module):
         # 1. Get the relative positions
         kernel_positions = self.get_rel_positions(x)
 
-        # # 1.1 dynamic cropping
-        # with torch.no_grad():
-        #     roots = gaussian_min_root(
-        #         thresh=self.mask_threshold,
-        #         mean=self.mask_mean_param,
-        #         sigma=self.mask_width_param,
-        #     )
-        #     kernel_positions = self.crop_kernel_positions_causal(
-        #         kernel_positions, roots
-        #     )
 
         # 2 Re-weight the output layer of the kernel net
         self.KernelNet.re_weight_output_layer(
@@ -266,22 +235,3 @@ class SepFlexConv(nn.Module):
         out = self.pointwise_conv(out)
 
         return out
-
-
-# # dynamic cropping
-# def gaussian_min_root(
-#     thresh: float,
-#     mean: float,
-#     sigma: float,
-# ):
-#     return torch.min(gaussian_inv_thresh(thresh, mean, sigma))
-
-
-# def gaussian_inv_thresh(
-#     thresh: float,
-#     mean: float,
-#     sigma: float,
-# ):
-#     # Based on the threshold value, compute the value of the roots
-#     aux = sigma * torch.sqrt(-2.0 * torch.log(thresh))
-#     return torch.stack([mean - aux, mean + aux], dim=1)

@@ -14,7 +14,7 @@ from models.modules import TCNBlock
 from ckconv import SepFlexConv
 from ckconv.ck import LinearLayer
 from models.modules.utils import GetBatchNormalization
-from models.modules.utils import GetAdaptiveAvgPool
+from models.modules.utils import GetAdaptiveAvgPool, GetDropout
 from omegaconf import OmegaConf
 
 
@@ -91,10 +91,13 @@ class CCNN(pl.LightningModule):
         self.pointwise_linear_layer = LinearLayer(
             data_dim, hidden_channels, out_channels
         )
+        
+        # dropout
+        self.dropout_layer = GetDropout(data_dim=data_dim, p=cfg.train.dropout_rate)
 
         # define sequencial modules
         self.seq_modules = nn.Sequential(
-            self.sep_flex_conv_layer,
+            self.dropout_layer,
             self.batch_norm_layer[0],
             self.gelu_layer,
             *self.blocks,
