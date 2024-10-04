@@ -16,6 +16,7 @@ class Cifar10DataModule(pl.LightningDataModule):
         self.cfg = cfg
         self.num_workers = 0 # for google colab training
         self._yaml_parameters()
+        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(42)
 
     def prepare_data(self):
         # download
@@ -75,7 +76,7 @@ class Cifar10DataModule(pl.LightningDataModule):
 
     def setup(self, stage: str):
         self._set_transform()
-        
+
         self.batch_size = self.cfg.train.batch_size
 
         # Assign train/val datasets for use in dataloaders
@@ -126,23 +127,29 @@ class Cifar10DataModule(pl.LightningDataModule):
 
 
     def train_dataloader(self):
-        return DataLoader(self.cifar10_train,
-                          batch_size=self.batch_size,
-                          num_workers=self.num_workers,
-                          shuffle=False)
+        return DataLoader(
+            self.cifar10_train,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=True,
+            generator=self.generator
+        )
 
     def val_dataloader(self):
-        return DataLoader(self.cifar10_val,
-                          batch_size=self.batch_size,
-                          num_workers=self.num_workers,
-                          shuffle=False)
-    
+        return DataLoader(
+            self.cifar10_val,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+            generator=self.generator
+        )
+
     def test_dataloader(self):
         return DataLoader(self.cifar10_test,
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
                           shuffle=False)
-    
+
     def predict_dataloader(self):
         return DataLoader(self.cifar10_predict,
                           batch_size=self.batch_size,
@@ -153,7 +160,7 @@ class Cifar10DataModule(pl.LightningDataModule):
         # Used to clean-up when the run is finished
         ...
 
-    
+
     def show_samples(self, num_samples: int = 5):
         dataset = self.cifar10_full
         fig, axes = plt.subplots(1, num_samples, figsize=(15, 3))

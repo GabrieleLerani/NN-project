@@ -97,6 +97,10 @@ def setup_trainer_components(cfg: OmegaConf):
     return logger, callbacks, profiler
 
 def create_trainer(cfg: OmegaConf, logger: TensorBoardLogger, callbacks: list, profiler: PyTorchProfiler) -> pl.Trainer:
+    # Ensure ModelCheckpoint is in the callbacks
+    if not any(isinstance(cb, ModelCheckpoint) for cb in callbacks):
+        raise ValueError("ModelCheckpoint callback must be included in the callbacks list.")
+    
     return pl.Trainer(
         logger=logger,
         accelerator=cfg.train.accelerator,
@@ -111,13 +115,14 @@ def create_trainer(cfg: OmegaConf, logger: TensorBoardLogger, callbacks: list, p
     )
 
 def train(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:
+    # start new training
     if not cfg.load_model.pre_trained or not exists_checkpoint_path(cfg):
         trainer.fit(model=model, datamodule=datamodule)
     # Load the model from a checkpoint
     else:
         trainer.fit(model=model, datamodule=datamodule, ckpt_path=get_checkpoint_path(cfg))
-
-    trainer.validate(model=model, datamodule=datamodule)
+    
+    trainer.validate(model=model, datamodule=datamodule, ckpt_path=get_checkpoint_path(cfg))
     trainer.test(model=model, datamodule=datamodule)
 
 def get_checkpoint_path(cfg: OmegaConf) -> str:

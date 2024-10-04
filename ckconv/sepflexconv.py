@@ -1,8 +1,13 @@
 import torch
 from torch import nn
 from ckconv.ck import MAGNet, create_coordinates, LinearLayer
+# from ck import MAGNet, create_coordinates, LinearLayer
+# from conv import fftconv, conv
 from ckconv.conv import fftconv, conv
+
 from omegaconf import OmegaConf
+import matplotlib.pyplot as plt
+import numpy as np
 
 class SepFlexConv(nn.Module):
     """
@@ -82,11 +87,15 @@ class SepFlexConv(nn.Module):
         # causal
         self.causal = net_cfg.causal
 
-        # init gaussian mask parameter
-        mask_mean_param = torch.ones(data_dim)
+        # init gaussian mask parameter, 
+        if self.causal:
+            mask_mean_param = torch.ones(data_dim)
+        else:
+            mask_mean_param = torch.zeros(data_dim)
+
         mask_width_param = torch.Tensor([0.075] * data_dim)
 
-        # self.mask_mean_param = torch.nn.Parameter(mask_mean_param)
+        # do not register mask mean
         self.register_buffer("mask_mean_param", mask_mean_param)
         self.mask_width_param = torch.nn.Parameter(mask_width_param)
 
@@ -97,6 +106,7 @@ class SepFlexConv(nn.Module):
             out_channels=in_channels,  # always in channel because separable
             no_layers=kernel_no_layers,
             omega_0=kernel_cfg.omega_0,
+            causal=net_cfg.causal
         )
 
         # Define the pointwise convolution layer (page 4 original paper)
@@ -107,7 +117,10 @@ class SepFlexConv(nn.Module):
             bias=net_cfg.bias,
         )
 
-
+        # initialize with kaimi
+        torch.nn.init.kaiming_normal_(self.pointwise_conv.layer.weight)
+        if self.pointwise_conv.layer.bias is not None:
+            torch.nn.init._no_grad_fill_(self.pointwise_conv.layer.bias, 0.0)
 
     def construct_masked_kernel(self, x):
         """
@@ -128,8 +141,7 @@ class SepFlexConv(nn.Module):
         """
 
         # 1. Get the relative positions
-        kernel_positions = self.get_rel_positions(x)
-
+        kernel_positions = self.get_rel_positions()
 
         # 2 Re-weight the output layer of the kernel net
         self.KernelNet.re_weight_output_layer(
@@ -146,11 +158,22 @@ class SepFlexConv(nn.Module):
             mask_sigma=self.mask_width_param,
         )
 
-        return conv_kernel * mask
+        self.log_mask = mask
+        self.log_kernel = conv_kernel
 
-    def get_rel_positions(self, x):
+        return conv_kernel * mask
+    
+    def get_rel_positions(self):
         """
         Handles the vector or relative positions which is given to KernelNet.
+        This method is responsible for creating and managing the kernel positions used in the convolution process.
+        It checks if the kernel positions need to be initialized or updated based on the input signal length.
+        
+        Args:
+            x (torch.Tensor): The input tensor to the SepFlexConv layer.
+            
+        Returns:
+            torch.Tensor: The tensor of relative positions to be used in the KernelNet.
         """
         if (
             self.kernel_positions.shape[-1] == 1  # Only for the first time
@@ -168,12 +191,6 @@ class SepFlexConv(nn.Module):
             self.kernel_positions = kernel_positions.type_as(self.kernel_positions)
             # -> With form: [batch_size=1, dim, x_dimension, y_dimension, ...]
 
-            # Save the step size for the calculation of dynamic cropping
-            # The step is max - min / (no_steps - 1)
-            # TODO : Check cropping
-            # self.linspace_stepsize = (
-            #     (1.0 - (-1.0)) / (self.positions_intervals_num)
-            # )
         return self.kernel_positions
 
     def gaussian_mask(
@@ -198,12 +215,12 @@ class SepFlexConv(nn.Module):
         """
 
         # reshape the mask_mean and mask_sigma so that they can be broadcasted
-        mask_mean = mask_mean.view(1, self.data_dim, *(1,) * self.data_dim)
-        mask_sigma = mask_sigma.view(1, self.data_dim, *(1,) * self.data_dim)
+        mask_mean = mask_mean.view(1, -1, *(1,) * self.data_dim)
+        mask_sigma = mask_sigma.view(1, -1, *(1,) * self.data_dim)
 
         return torch.exp(
             -0.5
-            * (1.0 / (mask_sigma ** 2) * (kernel_pos - mask_mean) ** 2).sum(
+            * (1.0 / (mask_sigma ** 2 + 1e-8) * (kernel_pos - mask_mean) ** 2).sum(
                 1, keepdim=True
             )
         )
@@ -235,3 +252,53 @@ class SepFlexConv(nn.Module):
         out = self.pointwise_conv(out)
 
         return out
+
+
+# if __name__ == '__main__':
+#     net_cfg = OmegaConf.create({
+#         'hidden_channels': 140,
+#         'bias': False,
+#         'causal': False
+#     })
+    
+#     kernel_cfg = OmegaConf.create({
+#         'kernel_no_layers': 3,
+#         'kernel_hidden_channels': 64,
+#         'kernel_size': 33,
+#         'conv_type': 'conv',
+#         'fft_threshold': 50,
+#         'omega_0': 20
+#     })
+
+#     # Initialize the SepFlexConv model
+#     model = SepFlexConv(
+#         data_dim=2,
+#         in_channels=3,
+#         net_cfg=net_cfg,
+#         kernel_cfg=kernel_cfg
+#     )
+
+#     # Create a random input tensor
+#     x = torch.randn(64, 3, 32, 32)  # Example input shape
+    
+    
+#     # plot the 2D mask for different width
+#     mask_mean_param = torch.zeros(2)
+#     fig, axs = plt.subplots(1, 5, figsize=(20, 4))
+#     for i, value in enumerate(np.linspace(0.075, 0.5, 5)): 
+#         mask_width_param = torch.Tensor([value] * 2)
+
+#         pos = model.get_rel_positions(x)
+#         mask = model.gaussian_mask(
+#             kernel_pos=pos, 
+#             mask_mean=mask_mean_param, 
+#             mask_sigma=mask_width_param
+#         ).squeeze(0).squeeze(0)
+
+#         ax = axs[i]
+#         im = ax.imshow(mask, cmap='hot', interpolation='nearest')
+#         ax.set_title(f"Mask for value={value}")
+#     plt.colorbar(im, ax=axs.ravel().tolist())
+#     plt.show()
+
+    

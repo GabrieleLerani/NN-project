@@ -1,0 +1,107 @@
+from torch import nn
+from .linear import LinearLayer
+import torch
+import numpy as np
+
+class AnisotropicGaborLayer(nn.Module):
+    def __init__(
+        self,
+        data_dim: int,
+        hidden_channels: int,
+        current_layer: int,
+        causal: bool,
+        omega_0: float = 2976.49,
+        alpha: float = 6.0,
+        beta: float = 1.0,
+    ):
+        super().__init__()
+
+        self.data_dim = data_dim
+
+        # linear layer
+        self.linear = LinearLayer(
+            dim=data_dim,
+            in_channels=data_dim,
+            out_channels=hidden_channels,
+            bias=True,
+        )
+
+        gamma_dist = torch.distributions.gamma.Gamma(alpha / (current_layer + 1), beta)
+
+        # generate as gamma_dist as data_dim (gamma_x, gamma_y, ...)
+        self.gamma = nn.ParameterList(
+            [
+                nn.Parameter(gamma_dist.sample((hidden_channels, 1)))
+                for _ in range(data_dim)
+            ]
+        )
+
+        normal_dist = torch.distributions.normal.Normal(0, 1)
+
+        # initial value for the mask
+        init_spatial_value = 0.075 * 1.667
+            
+
+        # generate as many mi as data_dim (mi_x, mi_y, ...)
+        self.mi = nn.ParameterList(
+            [
+                # nn.Parameter(normal_dist.sample((hidden_channels, 1)))
+                nn.Parameter(1.0 - init_spatial_value * torch.rand(hidden_channels, 1)) if causal else 
+                nn.Parameter(init_spatial_value * (2 * torch.rand(hidden_channels, 1) - 1))
+                for _ in range(data_dim)
+            ]
+        )
+
+        scaling_factor = 25.6
+
+        self.linear.weight = nn.Parameter(torch.randn(hidden_channels,data_dim,*((1,) * data_dim)))
+
+        # self.linear.weight.data *= omega_0 * scaling_factor * self.gamma[0].view(
+        #     *self.gamma[0].shape, *((1,) * data_dim)
+        # )
+
+        self.linear.bias = nn.Parameter(torch.randn(hidden_channels))
+        # self.linear.bias.data.uniform_(-np.pi, np.pi)
+
+        # TODO original implementation
+        self.linear.weight.data *= 2 * np.pi * omega_0 * self.gamma[0].view(
+            *self.gamma[0].shape, *((1,) * data_dim)
+        )
+
+        self.linear.bias.data.fill_(0.0)
+
+
+    def forward(self, x):
+
+        # coordinates (x,y,...)
+        coord = [x[0][i] for i in range(self.data_dim)]
+
+        # reshaping the parameters to [1, 1, 1, W, H] if data_dim = 2
+        reshaped_coord = [c.view(1, 1, 1, *c.shape) for c in coord]
+
+        reshaped_gamma = [
+            g.view(1, *g.shape, *((1,) * (self.data_dim))) for g in self.gamma
+        ]
+
+        reshaped_mi = [m.view(1, *m.shape, *((1,) * (self.data_dim))) for m in self.mi]
+        # -> [1, hidden_channels, 1, 1, 1] if data_dim = 2
+
+        g_envelopes = []
+        for i in range(self.data_dim):
+            g_envelope = torch.exp(
+                -0.5 * (reshaped_gamma[i] * (reshaped_coord[i] - reshaped_mi[i])) ** 2
+            )  # Shape: [1, hidden_channels, 20, 20]
+            g_envelopes.append(g_envelope)
+
+        # Multiply all the envelopes together
+        g_envelope = g_envelopes[0]
+        for i in range(1, self.data_dim):
+            g_envelope = g_envelope * g_envelopes[i]
+
+        # Squeeze the third dimension
+        g_envelope = g_envelope.squeeze(2)
+
+        # computing the sinusoidal
+        sinusoidal = torch.sin(self.linear(x))
+
+        return g_envelope * sinusoidal

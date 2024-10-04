@@ -23,6 +23,7 @@ class Cifar100DataModule(pl.LightningDataModule):
                 )
         ])
         self._yaml_parameters()
+        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(42)
 
 
     def prepare_data(self):
@@ -108,7 +109,8 @@ class Cifar100DataModule(pl.LightningDataModule):
             self.cifar100_train, 
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            shuffle=False
+            shuffle=True,
+            generator=self.generator
         )
 
     def val_dataloader(self):

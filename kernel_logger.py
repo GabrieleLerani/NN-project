@@ -7,7 +7,7 @@ class KernelLogger(pl.Callback):
         self.model_name = model_name
 
 
-    #def on_train_epoch_end(self, trainer, pl_module):
+    
     def on_after_backward(self, trainer, pl_module):
         kernel = pl_module.get_kernel()
         if kernel is not None:

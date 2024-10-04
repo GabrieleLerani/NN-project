@@ -24,17 +24,20 @@ class CCNN(pl.LightningModule):
 
     input --> SepFlexConv --> BatchNorm --> GELU --> L x S4Block --> BatchNorm --> GlobalAvgPool -->PointwiseLinear --> output
     """
-
     def __init__(
-        self, in_channels: int, out_channels: int, data_dim: int, cfg: OmegaConf
+        self,
+        in_channels: int,
+        out_channels: int,
+        data_dim: int,
+        cfg: OmegaConf
     ):
         super(CCNN, self).__init__()
+
 
         self.no_blocks = cfg.net.no_blocks
         hidden_channels = cfg.net.hidden_channels
 
         self.learning_rate = cfg.train.learning_rate
-        self.weight_decay = cfg.train.weight_decay
         self.warmup_epochs = cfg.train.warmup_epochs
         self.epochs = cfg.train.epochs
         self.start_factor = cfg.train.start_factor
@@ -50,15 +53,16 @@ class CCNN(pl.LightningModule):
             data_dim=data_dim,
             in_channels=in_channels,
             net_cfg=cfg.net,
-            kernel_cfg=cfg.kernel,
+            kernel_cfg=cfg.kernel
         )
         # batch normalization layer
         self.batch_norm_layer = [
             GetBatchNormalization(data_dim=data_dim, num_features=hidden_channels),
-            GetBatchNormalization(data_dim=data_dim, num_features=hidden_channels),
+            GetBatchNormalization(data_dim=data_dim, num_features=hidden_channels)
         ]
         # gelu layer
         self.gelu_layer = nn.GELU()
+
         # blocks can be either S4 or TCN
         self.blocks = []
         for _ in range(self.no_blocks):
@@ -69,35 +73,27 @@ class CCNN(pl.LightningModule):
                     data_dim=data_dim,
                     net_cfg=cfg.net,
                     kernel_cfg=cfg.kernel,
-                    dropout=cfg.train.dropout_rate,
+                    dropout=cfg.train.dropout_rate
                 )
                 self.blocks.append(s4)
             elif cfg.net.block_type == "tcn":
                 tcn = TCNBlock(
                     in_channels=hidden_channels,
                     out_channels=hidden_channels,
-                    data_dim=data_dim,
-                    net_cfg=cfg.net,
+                    data_dim=data_dim, net_cfg=cfg.net,
                     kernel_cfg=cfg.kernel,
-                    dropout=cfg.train.dropout_rate,
+                    dropout=cfg.train.dropout_rate
                 )
                 self.blocks.append(tcn)
 
         # global average pooling layer (the information of each channel is compressed into a single value)
-        self.global_avg_pool_layer = GetAdaptiveAvgPool(
-            data_dim=data_dim, output_size=(1,) * data_dim
-        )
+        self.global_avg_pool_layer = GetAdaptiveAvgPool(data_dim=data_dim, output_size=(1,) * data_dim)
         # pointwise linear convolutional layer
-        self.pointwise_linear_layer = LinearLayer(
-            data_dim, hidden_channels, out_channels
-        )
-        
-        # dropout
-        self.dropout_layer = GetDropout(data_dim=data_dim, p=cfg.train.dropout_rate)
+        self.pointwise_linear_layer = LinearLayer(data_dim, hidden_channels, out_channels)
 
         # define sequencial modules
         self.seq_modules = nn.Sequential(
-            self.dropout_layer,
+            self.sep_flex_conv_layer,
             self.batch_norm_layer[0],
             self.gelu_layer,
             *self.blocks,
@@ -121,17 +117,8 @@ class CCNN(pl.LightningModule):
             task="multiclass", num_classes=out_channels
         )
 
-        self.train_auroc = torchmetrics.classification.AUROC(
-            task="multiclass", num_classes=out_channels
-        )
-        self.val_auroc = torchmetrics.classification.AUROC(
-            task="multiclass", num_classes=out_channels
-        )
-        self.test_auroc = torchmetrics.classification.AUROC(
-            task="multiclass", num_classes=out_channels
-        )
-
     def forward(self, x):
+
         out = self.seq_modules(x)
 
         return out.squeeze()
@@ -139,13 +126,16 @@ class CCNN(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         loss, scores, y = self._common_step(batch, batch_idx)
         self.train_accuracy(scores, y)
+
         metrics_dict = {
             "train_loss": loss,
             "train_accuracy": self.train_accuracy,
         }
+
         self.log_dict(
             dictionary=metrics_dict, on_step=False, on_epoch=True, prog_bar=True
         )
+
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -154,26 +144,31 @@ class CCNN(pl.LightningModule):
         # Store predictions and labels for confusion matrix
         self.val_preds.append(scores.argmax(dim=1))
         self.val_labels.append(y)
-        
+
         self.val_accuracy(scores, y)
-        self.val_auroc(scores, y)
-        self.log("val_loss", loss)
-        self.log("accuracy", self.val_accuracy)
-        self.log("val_auroc", self.val_auroc)
+
+        metrics_dict = {
+            "val_loss": loss,
+            "val_accuracy": self.val_accuracy
+        }
+
+        self.log_dict(
+            dictionary=metrics_dict, on_step=False, on_epoch=True, prog_bar=True
+        )
 
         return loss
 
     def test_step(self, batch, batch_idx):
         loss, scores, y = self._common_step(batch, batch_idx)
         self.test_accuracy(scores, y)
-        self.test_auroc(scores, y)
 
         metrics_dict = {
             "loss": loss,
-            "test_auroc": self.test_auroc,
-            "accuracy": self.test_accuracy,
+            "accuracy": self.test_accuracy
         }
+
         self.log_dict(metrics_dict)
+
         return loss
 
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
@@ -181,21 +176,21 @@ class CCNN(pl.LightningModule):
         scores = self.seq_modules(x).squeeze()
         preds = torch.argmax(scores, dim=1)
         return preds
-    
+
     def on_validation_epoch_end(self):
         val_preds = torch.cat(self.val_preds)
         val_labels = torch.cat(self.val_labels)
 
         # Compute confusion matrix
         cm = confusion_matrix(val_labels.cpu().numpy(), val_preds.cpu().numpy())
-        
+
         # Plot confusion matrix
         self.plot_confusion_matrix(cm)
 
         # Clear stored predictions and labels for the next epoch
         self.val_preds.clear()
         self.val_labels.clear()
-        
+
 
     def plot_confusion_matrix(self, cm):
         fig, ax = plt.subplots(figsize=(10, 8))
@@ -233,18 +228,32 @@ class CCNN(pl.LightningModule):
         # Define the cosine annealing scheduler
         cosine_scheduler = optim.lr_scheduler.CosineAnnealingLR(
             optimizer=optimizer,
-            T_max=(self.epochs - self.warmup_epochs)
+            T_max=(self.epochs - self.warmup_epochs),
+            last_epoch=-self.warmup_epochs
         )
 
         # Combine the warm-up and cosine annealing using ChainedScheduler
         # ChainedScheduler applies both the schedulers at the same time
         # SequentialLR applies one scheduler at a time
-        scheduler = optim.lr_scheduler.ChainedScheduler(optimizer=optimizer, schedulers=[linear_warmup, cosine_scheduler])
+        scheduler = optim.lr_scheduler.SequentialLR(optimizer=optimizer, schedulers=[linear_warmup, cosine_scheduler], milestones=[self.warmup_epochs])
 
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
+
     def get_kernel(self):
-        sep_flex_conv_layer = self.seq_modules[0]
+        sep_flex_conv_layer = self.seq_modules[1]
         if isinstance(sep_flex_conv_layer, SepFlexConv):
             return sep_flex_conv_layer.masked_kernel
+        return None
+
+    def get_log_mask(self):
+        sep_flex_conv_layer = self.seq_modules[1]
+        if isinstance(sep_flex_conv_layer, SepFlexConv):
+            return sep_flex_conv_layer.log_mask
+        return None
+
+    def get_log_kernel(self):
+        sep_flex_conv_layer = self.seq_modules[1]
+        if isinstance(sep_flex_conv_layer, SepFlexConv):
+            return sep_flex_conv_layer.log_kernel
         return None

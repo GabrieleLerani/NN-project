@@ -1,4 +1,4 @@
-import pytorch_lightning as L
+import pytorch_lightning as pl
 from torchvision.datasets import MNIST
 from torch.utils.data import random_split, DataLoader, Dataset
 from torchvision import transforms
@@ -7,21 +7,30 @@ import matplotlib.pyplot as plt
 from omegaconf import OmegaConf
 from typing import Tuple
 import numpy as np
-import random
 
-class MnistDataModule(L.LightningDataModule):
+
+
+    
+class MnistDataModule(pl.LightningDataModule):
     def __init__(self, cfg:OmegaConf, data_dir: str = "datasets"):
         super().__init__()
         self.data_dir = data_dir
         self.type = cfg.data.dataset
         self.cfg = cfg
-        self.num_workers = 0  # for google colab training
+        self.num_workers = 7  # for google colab training
         self._yaml_parameters()
+        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(42)
 
     def prepare_data(self):
         # download
         MNIST(self.data_dir, train=True, download=True)
         MNIST(self.data_dir, train=False, download=True)
+
+
+    def _generate_permutation(self):
+        np.random.seed(42)
+        permutation = np.random.permutation(784)
+        return permutation
 
     def _set_transform(self):
 
@@ -35,8 +44,9 @@ class MnistDataModule(L.LightningDataModule):
             ]
         )
 
-        if self.type == "p_mnist":   
-            self.permutation = self._generate_permutation()  # Generate a fixed permutation     
+        if self.type == "p_mnist":
+            self.permutation = self._generate_permutation()  # Generate a fixed permutation
+            #print(self.permutation)
             self.transform.transforms.append(transforms.Lambda(
                         lambda x: x[:,self.permutation]  # fixed permutation
                     ))
@@ -45,7 +55,7 @@ class MnistDataModule(L.LightningDataModule):
         hidden_channels = self.cfg.net.hidden_channels
 
         OmegaConf.update(self.cfg, "train.batch_size", 100)
-        OmegaConf.update(self.cfg, "train.epochs", 210)
+        OmegaConf.update(self.cfg, "train.epochs", 72)
         OmegaConf.update(self.cfg, "net.in_channels", 1)
         OmegaConf.update(self.cfg, "net.out_channels", 10)
         OmegaConf.update(self.cfg, "net.data_dim", 1)
@@ -73,24 +83,24 @@ class MnistDataModule(L.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2985.63)
 
-    def setup(self, stage: str):
+    def setup(self, stage = None):
         self._set_transform()
 
         self.batch_size = self.cfg.train.batch_size
 
         # Assign train/val datasets for use in dataloaders
-        if stage == "fit":
+        if stage == "fit" or stage is None:
 
             self.mnist_train, self.mnist_val = self._get_train_dataset()
-            
+
         # Assign test dataset for use in dataloader(s)
-        if stage == "test":
+        if stage == "test" or stage is None:
             self.mnist_test = MNIST(
                 self.data_dir, train=False, transform=self.transform
             )
             print(f"Test set size: {len(self.mnist_test)}")
 
-        if stage == "predict":
+        if stage == "predict" or stage is None:
             self.mnist_predict = MNIST(
                 self.data_dir, train=False, transform=self.transform
             )
@@ -105,7 +115,7 @@ class MnistDataModule(L.LightningDataModule):
         mnist_train_full, mnist_val_full = random_split(
             self.mnist_full,
             [FULL_TRAIN_SIZE, FULL_VAL_SIZE],
-            generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+            generator=self.generator,
         )
 
         if self.cfg.data.reduced_dataset:
@@ -115,12 +125,12 @@ class MnistDataModule(L.LightningDataModule):
             mnist_train, _ = random_split(
                 mnist_train_full,
                 [REDUCED_TRAIN_SIZE, FULL_TRAIN_SIZE - REDUCED_TRAIN_SIZE],
-                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+                generator=self.generator
             )
             mnist_val, _ = random_split(
                 mnist_val_full,
                 [REDUCED_VAL_SIZE, FULL_VAL_SIZE - REDUCED_VAL_SIZE],
-                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+                generator=self.generator
             )
         else:
             mnist_train, mnist_val = mnist_train_full, mnist_val_full
@@ -128,14 +138,15 @@ class MnistDataModule(L.LightningDataModule):
         print(f"Training set size: {len(mnist_train)}")
         print(f"Validation set size: {len(mnist_val)}")
         return mnist_train, mnist_val
-        
+
 
     def train_dataloader(self):
         return DataLoader(
             self.mnist_train,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            shuffle=False,
+            shuffle=True,
+            generator=self.generator
         )
 
     def val_dataloader(self):
@@ -143,7 +154,7 @@ class MnistDataModule(L.LightningDataModule):
             self.mnist_val,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            shuffle=False,
+            shuffle=False
         )
 
     def test_dataloader(self):
@@ -151,7 +162,7 @@ class MnistDataModule(L.LightningDataModule):
             self.mnist_test,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            shuffle=False,
+            shuffle=False
         )
 
     def predict_dataloader(self):
@@ -159,7 +170,7 @@ class MnistDataModule(L.LightningDataModule):
             self.mnist_predict,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            shuffle=False,
+            shuffle=False
         )
 
     # def on_before_batch_transfer(self, batch, dataloader_idx: int):
@@ -180,53 +191,9 @@ class MnistDataModule(L.LightningDataModule):
             # Create the plot
             plt.figure(figsize=(10,10))  # Wide plot to fit 784 pixels
             plt.plot(image, marker='o', markersize=20, linestyle='-',)
-            
+
             # Add title and labels
             plt.title(f"Flattened Image of Label: {label}")
-    
- 
+
+
         plt.show()
-
-
-    def _generate_permutation(self):
-        random.seed(42)
-        np.random.seed(42)  # To ensure numpy operations are also reproducible
-        permutation = np.random.permutation(784)
-        return permutation
-
-
-if __name__ == "__main__":
-    cfg = OmegaConf.load("config/config.yaml")
-
-    mnist = MnistDataModule(cfg=cfg)
-    mnist.prepare_data()
-
-    mnist.setup("fit")
-    train_loader = mnist.train_dataloader()
-
-    mnist.show_samples(2)
-
-
-    max_len = 0
-
-    for images, labels in train_loader:
-        im=images
-        break
-
-    cfg = OmegaConf.load("config/config.yaml")
-
-    mnist = MnistDataModule(cfg=cfg)
-    mnist.prepare_data()
-
-    mnist.setup("fit")
-    train_loader = mnist.train_dataloader()
-
-
-    max_len = 0
-
-    for images, labels in train_loader:
-        im2=images
-        break
-    print(im==im2)
-        
-    mnist.show_samples(2)

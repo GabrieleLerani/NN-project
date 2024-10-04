@@ -18,7 +18,7 @@ kernel:
 
 load_model:
   pre_trained: True
-  model: "last"
+  model: "top"
 
 train:
   logger: True
