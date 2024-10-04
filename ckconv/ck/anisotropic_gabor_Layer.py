@@ -4,6 +4,16 @@ import torch
 import numpy as np
 
 class AnisotropicGaborLayer(nn.Module):
+    """
+    This class implements an Anisotropic Gabor Layer, a type of layer used in the MAGNets.
+
+    Attributes:
+        data_dim (int): The dimension of the input data.
+        linear (LinearLayer): A linear layer that applies a linear transformation to the input data.
+        gamma (nn.ParameterList): A list of learnable parameters that control the scale of the Gabor filters.
+        mi (nn.ParameterList): A list of learnable parameters that control the center of the Gabor filters.
+    """
+
     def __init__(
         self,
         data_dim: int,
@@ -14,6 +24,18 @@ class AnisotropicGaborLayer(nn.Module):
         alpha: float = 6.0,
         beta: float = 1.0,
     ):
+        """
+        Initializes an instance of the AnisotropicGaborLayer class.
+
+        Args:
+            data_dim (int): The dimension of the input data.
+            hidden_channels (int): The number of hidden channels in the linear layer.
+            current_layer (int): The current layer number, used to adjust the scale of the Gabor filters.
+            causal (bool): A flag indicating whether the layer is causal or not.
+            omega_0 (float, optional): The base frequency of the Gabor filters. Defaults to 2976.49.
+            alpha (float, optional): The shape parameter of the gamma distribution used to sample the scale of the Gabor filters. Defaults to 6.0.
+            beta (float, optional): The rate parameter of the gamma distribution used to sample the scale of the Gabor filters. Defaults to 1.0.
+        """
         super().__init__()
 
         self.data_dim = data_dim
