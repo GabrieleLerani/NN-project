@@ -40,11 +40,3 @@ def create_coordinates(kernel_size, data_dim):
     grids = torch.stack(grids, dim=0).unsqueeze(0)  # stack along a new dimension [2,3,3] and another dimension [1,2,3,3]
     
     return grids
-
-
-
-    
-a = create_coordinates(3, 2)
-
-print(a)
-print(a.shape)
