@@ -242,19 +242,19 @@ class CCNN(pl.LightningModule):
 
 
     def get_kernel(self):
-        sep_flex_conv_layer = self.seq_modules[1]
+        sep_flex_conv_layer = self.seq_modules[0]
         if isinstance(sep_flex_conv_layer, SepFlexConv):
             return sep_flex_conv_layer.masked_kernel
         return None
 
     def get_log_mask(self):
-        sep_flex_conv_layer = self.seq_modules[1]
+        sep_flex_conv_layer = self.seq_modules[0]
         if isinstance(sep_flex_conv_layer, SepFlexConv):
             return sep_flex_conv_layer.log_mask
         return None
 
     def get_log_kernel(self):
-        sep_flex_conv_layer = self.seq_modules[1]
+        sep_flex_conv_layer = self.seq_modules[0]
         if isinstance(sep_flex_conv_layer, SepFlexConv):
             return sep_flex_conv_layer.log_kernel
         return None
