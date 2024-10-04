@@ -190,8 +190,7 @@ class TextDataModule(pl.LightningDataModule):
         def encode_tokens(input):
             tokens = input["Source"]
             encoded_tokens = (
-                [word_to_number["<bos>"]]
-                + [
+                [
                     (
                         word_to_number[token]
                         if token in word_to_number
