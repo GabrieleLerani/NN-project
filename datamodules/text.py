@@ -280,7 +280,7 @@ class TextDataModule(pl.LightningDataModule):
             self.train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
-            generator=self.generator
+            generator=self.generator,
             drop_last=True,
             collate_fn=self.collate_fn,
         )
