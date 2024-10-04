@@ -58,11 +58,13 @@ class TextDataModule(pl.LightningDataModule):
         self.special_tokens = ["<unk>", "<bos>", "<eos>", "<pad>"]
 
         self.max_length = 4096
-        self.val_split = 0.1
+        self.val_split = 0.0
 
         self.cfg = cfg
 
         self._yaml_parameters()
+        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(42)
+
 
     def _set_transform(self):
 
@@ -172,24 +174,23 @@ class TextDataModule(pl.LightningDataModule):
         word_to_number = {
             word: i + 1
             for i, word in enumerate(vocab_set)
-            if token_counts[word] >= 20 or word in self.special_tokens
+            if token_counts[word] >= 15 or word in self.special_tokens
         }
 
         print(len(word_to_number))
-        # # normalization
-        # self.max_vocab_value = len(vocab_set)
-        # word_to_number = {
-        #     word: (value - 1) / (self.max_vocab_value - 1)
-        #     for word, value in word_to_number.items()
-        # }
+        # normalization
+        self.max_vocab_value = len(vocab_set)
+        word_to_number = {
+            word: (value - 1) / (self.max_vocab_value - 1)
+            for word, value in word_to_number.items()
+        }
 
         # print(vocab_set)
 
         def encode_tokens(input):
             tokens = input["Source"]
             encoded_tokens = (
-                [word_to_number["<bos>"]]
-                + [
+                [
                     (
                         word_to_number[token]
                         if token in word_to_number
@@ -237,17 +238,9 @@ class TextDataModule(pl.LightningDataModule):
 
         # assign train/val datasets for use in dataloaders
         if stage == "fit":
-            total_size = len(self.dataset["train"])
-            val_size = int(self.val_split * total_size)
-            train_size = total_size - val_size
 
-            self.train_dataset, self.val_dataset = random_split(
-                self.dataset["train"],
-                [train_size, val_size],
-                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(
-                    getattr(self, "seed", 42)
-                ),
-            )
+            self.train_dataset = self.dataset["train"]
+            self.val_dataset = self.dataset["test"]
 
         if stage == "test":
             self.test_dataset = self.dataset["test"]
@@ -286,7 +279,8 @@ class TextDataModule(pl.LightningDataModule):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
-            shuffle=False,
+            shuffle=True,
+            generator=self.generator,
             drop_last=True,
             collate_fn=self.collate_fn,
         )
