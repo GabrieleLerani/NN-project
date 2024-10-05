@@ -38,6 +38,7 @@ class CCNN(pl.LightningModule):
         hidden_channels = cfg.net.hidden_channels
 
         self.learning_rate = cfg.train.learning_rate
+        self.mask_lr_ratio = cfg.train.mask_lr_ratio
         self.warmup_epochs = cfg.train.warmup_epochs
         self.epochs = cfg.train.epochs
         self.start_factor = cfg.train.start_factor
@@ -211,8 +212,11 @@ class CCNN(pl.LightningModule):
 
     def configure_optimizers(self):
         # Define the optimizer (AdamW)
+
+        parameters = self._get_params()
+
         optimizer = optim.AdamW(
-            params=self.parameters(),
+            params=parameters,
             lr=self.learning_rate,
             weight_decay=self.weight_decay
         )
@@ -240,6 +244,35 @@ class CCNN(pl.LightningModule):
 
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
+    def _get_params(self):
+            
+        
+        mask_lr = self.learning_rate * self.mask_lr_ratio
+
+        # Divide params in mask parameters & other parameters
+        all_parameters = set(self.parameters())
+        # mask_params
+        mask_params = []
+        for m in self.modules():
+            if isinstance(m, SepFlexConv):
+                mask_params += list(
+                    map(
+                        lambda x: x[1],
+                        list(
+                            filter(lambda kv: "mask_params" in kv[0], m.named_parameters())
+                        ),
+                    )
+                )
+        mask_params = set(mask_params)
+        other_params = all_parameters - mask_params
+        # as list
+        mask_params = list(mask_params)
+        other_params = list(other_params)
+        parameters = [
+            {"params": other_params},
+            {"params": mask_params, "lr": mask_lr},
+        ]
+        return parameters
 
     def get_kernel(self):
         sep_flex_conv_layer = self.seq_modules[0]
