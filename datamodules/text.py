@@ -56,7 +56,7 @@ class TextDataModule(pl.LightningDataModule):
         self.tokenizer_type = "char"
         self.special_tokens = ["<unk>", "<bos>", "<eos>"]
 
-        self.max_length = 200
+        self.max_length = 512
         self.val_split = 0.0
 
         self.cfg = cfg
