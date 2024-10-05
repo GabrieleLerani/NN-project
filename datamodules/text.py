@@ -49,22 +49,23 @@ class TextDataModule(pl.LightningDataModule):
         # Save parameters to self
         self.data_dir = Path(data_dir) / "IMDB"
         self.num_workers = 1
-        self.batch_size = cfg.train.batch_size
         self.serialized_dataset_path = os.path.join(
             self.data_dir, "preprocessed_dataset_imdb"
         )
 
         self.tokenizer_type = "char"
-        self.special_tokens = ["<unk>", "<bos>", "<eos>", "<pad>"]
+        self.special_tokens = ["<unk>", "<bos>", "<eos>"]
 
-        self.max_length = 4096
+        self.max_length = 200
         self.val_split = 0.0
 
         self.cfg = cfg
 
         self._yaml_parameters()
-        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(42)
-
+        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(
+            42
+        )
+        self.batch_size = cfg.train.batch_size
 
     def _set_transform(self):
 
@@ -132,10 +133,13 @@ class TextDataModule(pl.LightningDataModule):
             # apply renaming
             self.dataset[split] = self.dataset[split].map(
                 adapt_example,
+                remove_columns=["text", "label"],
                 keep_in_memory=True,
                 load_from_cache_file=False,
                 num_proc=self.num_workers,
             )
+
+        # print(f"original {self.dataset["train"][0]}")
 
         def w_tokenize(input):
             return {"Source": word_tokenize(input["Source"]), "Target": input["Target"]}
@@ -153,7 +157,6 @@ class TextDataModule(pl.LightningDataModule):
 
         # building vocabulary
 
-        lengths = []
         vocab_set = set()
         vocab_list = []
 
@@ -163,11 +166,12 @@ class TextDataModule(pl.LightningDataModule):
             examples = np.reshape(
                 examples, (-1)
             ).tolist()  # flatten and convert to list
-            lengths.append(len(examples))  # track the number of tokens
             vocab_list.extend(examples)
             vocab_set.update(examples)  # add tokens to the vocabulary set
         vocab_set.update(self.special_tokens)  # special tokens
         vocab_set = list(set(vocab_set))
+        vocab_set = sorted(set(vocab_set))  # sort to ensure consistent indexing
+
         token_counts = Counter(vocab_list)
 
         # encoding
@@ -177,30 +181,28 @@ class TextDataModule(pl.LightningDataModule):
             if token_counts[word] >= 15 or word in self.special_tokens
         }
 
-        print(len(word_to_number))
-        # normalization
-        self.max_vocab_value = len(vocab_set)
-        word_to_number = {
-            word: (value - 1) / (self.max_vocab_value - 1)
-            for word, value in word_to_number.items()
-        }
-
-        # print(vocab_set)
+        # print(f"vocab {word_to_number}")
 
         def encode_tokens(input):
             tokens = input["Source"]
-            encoded_tokens = (
-                [
-                    (
-                        word_to_number[token]
-                        if token in word_to_number
-                        else word_to_number["<unk>"]
-                    )
-                    for token in tokens
-                ]
-                + [word_to_number["<eos>"]]
-            )
-            return {"Source": encoded_tokens, "Target": input["Target"]}
+            encoded_tokens = [
+                (
+                    word_to_number[token]
+                    if token in word_to_number
+                    else word_to_number["<unk>"]
+                )
+                for token in tokens
+            ] + [word_to_number["<eos>"]]
+
+            if len(encoded_tokens) < self.max_length:
+                padding_size = self.max_length - len(encoded_tokens)
+                encoded_tokens = [0] * padding_size + encoded_tokens
+            elif len(encoded_tokens) > self.max_length:
+                encoded_tokens = encoded_tokens[: self.max_length]
+            return {
+                "Source": encoded_tokens,
+                "Target": input["Target"],
+            }
 
         for split in ["train", "test"]:
 
@@ -212,6 +214,8 @@ class TextDataModule(pl.LightningDataModule):
                 num_proc=self.num_workers,
             )
 
+            # print(f"normal {self.dataset["train"][0]}")
+
             # apply encoding
             self.dataset[split] = self.dataset[split].map(
                 encode_tokens,
@@ -219,6 +223,7 @@ class TextDataModule(pl.LightningDataModule):
                 load_from_cache_file=False,
                 num_proc=self.num_workers,
             )
+            # print(f"encoded {self.dataset["train"][0]}")
 
         print(f"Saving dataset to {self.serialized_dataset_path}...")
         self.dataset.save_to_disk(self.serialized_dataset_path)
@@ -246,34 +251,16 @@ class TextDataModule(pl.LightningDataModule):
             self.test_dataset = self.dataset["test"]
 
         # batching and padding
-        def collate_batch(batch):
-            input_ids = [data["Source"] for data in batch]
-            labels = [data["Target"] for data in batch]
+        def collate_fn(batch):
+            # print(batch[:5])
+            xs, ys = zip(*[(data["Source"], data["Target"]) for data in batch])
+            xs = torch.stack([torch.tensor(x) for x in xs])
+            xs = xs.unsqueeze(1).float()
+            ys = torch.tensor(ys)
+            # print(ys)
+            return xs, ys
 
-            # Convert lists of input IDs to tensors and pad them
-            padded_input_ids = torch.nn.utils.rnn.pad_sequence(
-                [torch.tensor(seq) for seq in input_ids],
-                batch_first=True,
-                padding_value=0,
-            )
-
-            # truncate or pad to max_length
-            if padded_input_ids.size(1) > self.max_length:
-                padded_input_ids = padded_input_ids[:, : self.max_length]
-            else:
-                padding_size = self.max_length - padded_input_ids.size(1)
-                padded_input_ids = torch.nn.functional.pad(
-                    padded_input_ids,
-                    (0, padding_size),  # right padding
-                    value=0,
-                )
-
-            input_tensor = padded_input_ids.float().unsqueeze(1)
-            label_tensor = torch.tensor(labels)
-
-            return input_tensor, label_tensor
-
-        self.collate_fn = collate_batch
+        self.collate_fn = collate_fn
 
     def train_dataloader(self):
         return DataLoader(
@@ -281,7 +268,7 @@ class TextDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             generator=self.generator,
-            drop_last=True,
+            # drop_last=True,
             collate_fn=self.collate_fn,
         )
 
@@ -313,7 +300,8 @@ if __name__ == "__main__":
     dm.setup(stage="fit")
     train_loader = dm.train_dataloader()
 
-    max_len = 0
-
-    for images, labels in train_loader:
-        break
+    for batch in train_loader:
+        input_tensor, label_tensor = batch
+        # print(f"input {input_tensor}clabel {label_tensor}")
+        print(f"input single  {input_tensor[0]} label single {label_tensor[0]}")
+    print(f"Input shape: {input_tensor.shape}, Labels shape: {label_tensor.shape}")

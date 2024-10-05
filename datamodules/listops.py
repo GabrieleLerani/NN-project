@@ -25,16 +25,19 @@ class ListOpsDataModule(pl.LightningDataModule):
         super().__init__()
         self.data_dir = Path(data_dir)
         self.num_workers = 7
-        self.batch_size = cfg.train.batch_size
         self.serialized_dataset_path = os.path.join(
             self.data_dir, "preprocessed_dataset_listops"
         )
-        self.max_length = 5
+        self.max_length = 2048
         self.special_tokens = ["<unk>", "<bos>", "<eos>"]
 
         self.cfg = cfg
 
         self._yaml_parameters()
+        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(
+            42
+        )
+        self.batch_size = cfg.train.batch_size
 
     def _set_transform(self):
         self.transform = transforms.Compose([transforms.ToTensor()])
@@ -130,30 +133,31 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.dataset.set_format(type="torch", columns=["Source", "Target"])
 
         def cleanFeatures(input):
-            # Extract the source text
-            text = input["Source"]
-
-            # replace close brackets with 'X'
-            text = re.sub(r"\]", "X", text)
-
-            # remove open brackets '(' and close brackets ')'
-            text = re.sub(r"[()]", "", text)
-
-            return {"Source": word_tokenize(text), "Target": input["Target"]}
+            return {
+                "Source": input["Source"]
+                .replace("]", "X")
+                .replace("(", "")
+                .replace(")", "")
+                .split(),
+                "Target": input["Target"],
+            }
 
         # building vocabulary
-        lengths = []
+
         vocab_set = set()
+        vocab_list = []
+
         for i, data in enumerate(self.dataset["train"]):
-            examples = word_tokenize(data["Source"])
+            examples = cleanFeatures(data)
+            examples = examples["Source"]
             examples = np.reshape(
                 examples, (-1)
             ).tolist()  # flatten and convert to list
-            lengths.append(len(examples))  # track the number of tokens
+            vocab_list.extend(examples)
             vocab_set.update(examples)  # add tokens to the vocabulary set
         vocab_set.update(self.special_tokens)  # special tokens
         vocab_set = list(set(vocab_set))
-        print(vocab_set)
+        vocab_set = sorted(set(vocab_set))  # sort to ensure consistent indexing
 
         # encoding
         word_to_number = {word: i + 1 for i, word in enumerate(vocab_set)}
@@ -161,9 +165,23 @@ class ListOpsDataModule(pl.LightningDataModule):
         def encode_tokens(input):
             tokens = input["Source"]
             encoded_tokens = [
-                word_to_number[token] for token in tokens if token in word_to_number
-            ]
-            return {"Source": encoded_tokens, "Target": input["Target"]}
+                (
+                    word_to_number[token]
+                    if token in word_to_number
+                    else word_to_number["<unk>"]
+                )
+                for token in tokens
+            ] + [word_to_number["<eos>"]]
+
+            if len(encoded_tokens) < self.max_length:
+                padding_size = self.max_length - len(encoded_tokens)
+                encoded_tokens = [0] * padding_size + encoded_tokens
+            elif len(encoded_tokens) > self.max_length:
+                encoded_tokens = encoded_tokens[: self.max_length]
+            return {
+                "Source": encoded_tokens,
+                "Target": input["Target"],
+            }
 
         for split in ["train", "val", "test"]:
             # apply clean close brackets
@@ -226,41 +244,22 @@ class ListOpsDataModule(pl.LightningDataModule):
             self.test_dataset = self.dataset["test"]
 
         # batching and padding
-        def collate_batch(batch):
-            input_ids = [data["Source"] for data in batch]
-            labels = [data["Target"] for data in batch]
+        def collate_fn(batch):
+            # print(batch)
+            xs, ys = zip(*[(data["Source"], data["Target"]) for data in batch])
+            xs = torch.stack([torch.tensor(x) for x in xs])
+            xs = xs.unsqueeze(1).float()
+            ys = torch.tensor(ys)
+            return xs, ys
 
-            # Convert lists of input IDs to tensors and pad them
-            padded_input_ids = torch.nn.utils.rnn.pad_sequence(
-                [seq.clone().detach() for seq in input_ids],
-                batch_first=True,
-                padding_value=0,
-            )
-
-            # truncate or pad to max_length
-            if padded_input_ids.size(1) > self.max_length:
-                padded_input_ids = padded_input_ids[:, : self.max_length]
-            else:
-                padding_size = self.max_length - padded_input_ids.size(1)
-                padded_input_ids = torch.nn.functional.pad(
-                    padded_input_ids,
-                    (0, padding_size),  # right padding
-                    value=0,
-                )
-
-            input_tensor = padded_input_ids.float().unsqueeze(1)
-            label_tensor = torch.tensor(labels)
-
-            return input_tensor, label_tensor
-
-        self.collate_fn = collate_batch
+        self.collate_fn = collate_fn
 
     def train_dataloader(self):
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
-            drop_last=True,
+            generator=self.generator,
             collate_fn=self.collate_fn,
         )
 
@@ -293,9 +292,8 @@ if __name__ == "__main__":
     dm.setup(stage="fit")
     train_loader = dm.train_dataloader()
 
-    for images, labels in train_loader:
-        print(f"Batch of images shape: {images.shape}")
-        print(f"Batch of labels: {labels}")
-        print(f"First image tensor: {images[0]}")
-        print(f"First label: {labels[0]}")
-        break
+    for batch in train_loader:
+        input_tensor, label_tensor = batch
+        # print(f"input {input_tensor}clabel {label_tensor}")
+        print(f"input single  {input_tensor[0]} label single {label_tensor[0]}")
+    print(f"Input shape: {input_tensor.shape}, Labels shape: {label_tensor.shape}")
