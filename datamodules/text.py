@@ -79,8 +79,8 @@ class TextDataModule(pl.LightningDataModule):
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
 
-        OmegaConf.update(self.cfg, "train.batch_size", 8)  # real 50
-        OmegaConf.update(self.cfg, "train.epochs", 20)  # real 60
+        OmegaConf.update(self.cfg, "train.batch_size", 16)  # real 50
+        OmegaConf.update(self.cfg, "train.epochs", 100)  # real 60
         OmegaConf.update(self.cfg, "net.in_channels", 1)
         OmegaConf.update(self.cfg, "net.out_channels", 2)
         OmegaConf.update(self.cfg, "kernel.omega_0", 2966.60)
@@ -88,7 +88,7 @@ class TextDataModule(pl.LightningDataModule):
 
         if hidden_channels == 140:
             OmegaConf.update(self.cfg, "train.weight_decay", 1e-5)
-            OmegaConf.update(self.cfg, "train.learning_rate", 0.0005)  # real 0.001
+            OmegaConf.update(self.cfg, "train.learning_rate", 0.001)  # real 0.001
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
 
         elif hidden_channels == 380:
@@ -102,6 +102,23 @@ class TextDataModule(pl.LightningDataModule):
         self.dataset = DatasetDict(
             train=self.dataset["train"], test=self.dataset["test"]
         )
+        import matplotlib.pyplot as plt
+
+        # Step 1: Calculate the lengths of the text in the dataset
+        lengths = [len(list(ex["text"])) for ex in self.dataset["train"]]
+
+        # Step 2: Create a histogram
+        plt.hist(lengths, bins=30, edgecolor='black')  # You can adjust the number of bins as needed
+
+        # Step 3: Add titles and labels
+        plt.title('Histogram of Text Lengths')
+        plt.xlabel('Length of Text')
+        plt.ylabel('Frequency')
+
+        # Step 4: Show the plot
+        plt.show()
+        # print(f" MEDIUM LENGTH {sum(lengths) / len(lengths)}")
+        # print(self.dataset["train"]["text"])
 
     def _loading_pipeline(self):
         """
@@ -158,19 +175,50 @@ class TextDataModule(pl.LightningDataModule):
             tokenizer = char_tokenize
 
         # building vocabulary
-        allowed_characters = string.ascii_letters + string.punctuation + string.digits
+        import unicodedata
 
-        word_to_number = {char: i + 2 for i, char in enumerate(allowed_characters)}
+        # # Start with ascii letters, digits, and punctuation
+        # allowed_characters = string.ascii_letters + string.punctuation + string.digits + string.whitespace
+
+        # # Collect all unicode characters
+        # all_unicode_characters = ''.join(chr(i) for i in range(0x110000) if unicodedata.category(chr(i)) not in ('Cc', 'Cf', 'Cn', 'Cs'))
+
+        # # Combine them all
+        # allowed_characters += all_unicode_characters
+
+        # # Now you have all characters combined (ASCII + Unicode)
+        # print(allowed_characters)
+
+        # word_to_number = {char: i + 2 for i, char in enumerate(allowed_characters)}
+
+        vocab_set = set()
+        vocab_list = []
+
+        for i, data in enumerate(self.dataset["train"]):
+            examples = tokenizer(data)
+            examples = examples["Source"]
+            vocab_list.extend(examples)
+            vocab_set.update(examples)  # add tokens to the vocabulary set
+        vocab_set.update(self.special_tokens)  # special tokens
+        vocab_set = list(set(vocab_set))
+        token_counts = Counter(vocab_list)
+
+        # encoding
+        word_to_number = {
+            word: i + 1
+            for i, word in enumerate(vocab_set)
+            if token_counts[word] >= 15 or word in self.special_tokens
+        }
+
         # reserved tokebns
         word_to_number["<pad>"] = 0
         word_to_number["<eos>"] = 1
         word_to_number["<unk>"] = -1
 
+        print(word_to_number)
+
         def encode_tokens(input):
             tokens = input["Source"]
-            for toks in tokens:
-                if toks not in word_to_number:
-                    print(toks)
             encoded_tokens = [
                 (
                     word_to_number[token]
@@ -278,8 +326,8 @@ if __name__ == "__main__":
     dm.setup(stage="fit")
     train_loader = dm.train_dataloader()
 
-    for batch in train_loader:
-        input_tensor, label_tensor = batch
-        # print(f"input {input_tensor}clabel {label_tensor}")
-        print(f"input single  {input_tensor[0]} label single {label_tensor[0]}")
-    print(f"Input shape: {input_tensor.shape}, Labels shape: {label_tensor.shape}")
+    # for batch in train_loader:
+    #     input_tensor, label_tensor = batch
+    #     # print(f"input {input_tensor}clabel {label_tensor}")
+    #     print(f"input single  {input_tensor[0]} label single {label_tensor[0]}")
+    # print(f"Input shape: {input_tensor.shape}, Labels shape: {label_tensor.shape}")
