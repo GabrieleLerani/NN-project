@@ -7,6 +7,7 @@ from torchvision import transforms
 import pytorch_lightning as pl
 from torch.utils.data import random_split
 from collections import Counter
+import string
 
 
 from datasets import load_dataset, DatasetDict
@@ -56,7 +57,7 @@ class TextDataModule(pl.LightningDataModule):
         self.tokenizer_type = "char"
         self.special_tokens = ["<unk>", "<bos>", "<eos>"]
 
-        self.max_length = 512
+        self.max_length = 256  # real 4096
         self.val_split = 0.0
 
         self.cfg = cfg
@@ -78,8 +79,8 @@ class TextDataModule(pl.LightningDataModule):
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
 
-        OmegaConf.update(self.cfg, "train.batch_size", 50)
-        OmegaConf.update(self.cfg, "train.epochs", 60)
+        OmegaConf.update(self.cfg, "train.batch_size", 8)  # real 50
+        OmegaConf.update(self.cfg, "train.epochs", 20)  # real 60
         OmegaConf.update(self.cfg, "net.in_channels", 1)
         OmegaConf.update(self.cfg, "net.out_channels", 2)
         OmegaConf.update(self.cfg, "kernel.omega_0", 2966.60)
@@ -87,7 +88,7 @@ class TextDataModule(pl.LightningDataModule):
 
         if hidden_channels == 140:
             OmegaConf.update(self.cfg, "train.weight_decay", 1e-5)
-            OmegaConf.update(self.cfg, "train.learning_rate", 0.001)
+            OmegaConf.update(self.cfg, "train.learning_rate", 0.0005)  # real 0.001
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
 
         elif hidden_channels == 380:
@@ -126,27 +127,28 @@ class TextDataModule(pl.LightningDataModule):
         """
 
         def adapt_example(example):
-            return {"Source": example["text"].lower(), "Target": example["label"]}
+            return {
+                "Source": example["text"],
+                "Target": example["label"],
+            }
 
-        for split in ["train", "test"]:
-
-            # apply renaming
-            self.dataset[split] = self.dataset[split].map(
-                adapt_example,
-                remove_columns=["text", "label"],
-                keep_in_memory=True,
-                load_from_cache_file=False,
-                num_proc=self.num_workers,
-            )
-
-        # print(f"original {self.dataset["train"][0]}")
+        self.dataset = self.dataset.map(
+            adapt_example,
+            remove_columns=["text", "label"],
+            keep_in_memory=True,
+            load_from_cache_file=False,
+            num_proc=self.num_workers,
+        )
 
         def w_tokenize(input):
-            return {"Source": word_tokenize(input["Source"]), "Target": input["Target"]}
+            return {
+                "Source": word_tokenize(input["Source"])[: self.max_length],
+                "Target": input["Target"],
+            }
 
         def char_tokenize(input):
             return {
-                "Source": list(input["Source"]),  # or .encode("utf-8") byte level
+                "Source": list(input["Source"])[: self.max_length],
                 "Target": input["Target"],
             }
 
@@ -156,35 +158,19 @@ class TextDataModule(pl.LightningDataModule):
             tokenizer = char_tokenize
 
         # building vocabulary
+        allowed_characters = string.ascii_letters + string.punctuation + string.digits
 
-        vocab_set = set()
-        vocab_list = []
-
-        for i, data in enumerate(self.dataset["train"]):
-            examples = tokenizer(data)
-            examples = examples["Source"]
-            examples = np.reshape(
-                examples, (-1)
-            ).tolist()  # flatten and convert to list
-            vocab_list.extend(examples)
-            vocab_set.update(examples)  # add tokens to the vocabulary set
-        vocab_set.update(self.special_tokens)  # special tokens
-        vocab_set = list(set(vocab_set))
-        vocab_set = sorted(set(vocab_set))  # sort to ensure consistent indexing
-
-        token_counts = Counter(vocab_list)
-
-        # encoding
-        word_to_number = {
-            word: i + 1
-            for i, word in enumerate(vocab_set)
-            if token_counts[word] >= 15 or word in self.special_tokens
-        }
-
-        # print(f"vocab {word_to_number}")
+        word_to_number = {char: i + 2 for i, char in enumerate(allowed_characters)}
+        # reserved tokebns
+        word_to_number["<pad>"] = 0
+        word_to_number["<eos>"] = 1
+        word_to_number["<unk>"] = -1
 
         def encode_tokens(input):
             tokens = input["Source"]
+            for toks in tokens:
+                if toks not in word_to_number:
+                    print(toks)
             encoded_tokens = [
                 (
                     word_to_number[token]
@@ -204,26 +190,20 @@ class TextDataModule(pl.LightningDataModule):
                 "Target": input["Target"],
             }
 
-        for split in ["train", "test"]:
-
-            # apply tokenizer
-            self.dataset[split] = self.dataset[split].map(
-                tokenizer,
-                keep_in_memory=True,
-                load_from_cache_file=False,
-                num_proc=self.num_workers,
-            )
-
-            # print(f"normal {self.dataset["train"][0]}")
-
-            # apply encoding
-            self.dataset[split] = self.dataset[split].map(
-                encode_tokens,
-                keep_in_memory=True,
-                load_from_cache_file=False,
-                num_proc=self.num_workers,
-            )
-            # print(f"encoded {self.dataset["train"][0]}")
+        # tokenization
+        self.dataset = self.dataset.map(
+            tokenizer,
+            keep_in_memory=True,
+            load_from_cache_file=False,
+            num_proc=self.num_workers,
+        )
+        # embeddings
+        self.dataset = self.dataset.map(
+            encode_tokens,
+            keep_in_memory=True,
+            load_from_cache_file=False,
+            num_proc=self.num_workers,
+        )
 
         print(f"Saving dataset to {self.serialized_dataset_path}...")
         self.dataset.save_to_disk(self.serialized_dataset_path)
@@ -252,12 +232,10 @@ class TextDataModule(pl.LightningDataModule):
 
         # batching and padding
         def collate_fn(batch):
-            # print(batch[:5])
             xs, ys = zip(*[(data["Source"], data["Target"]) for data in batch])
             xs = torch.stack([torch.tensor(x) for x in xs])
             xs = xs.unsqueeze(1).float()
             ys = torch.tensor(ys)
-            # print(ys)
             return xs, ys
 
         self.collate_fn = collate_fn

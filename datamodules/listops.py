@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader
 import os
 import requests
 import tarfile
+import string
 import torch
 from pathlib import Path
 from transformers import AutoTokenizer
@@ -28,7 +29,7 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.serialized_dataset_path = os.path.join(
             self.data_dir, "preprocessed_dataset_listops"
         )
-        self.max_length = 2048
+        self.max_length = 2048  # real 2048
         self.special_tokens = ["<unk>", "<bos>", "<eos>"]
 
         self.cfg = cfg
@@ -83,12 +84,12 @@ class ListOpsDataModule(pl.LightningDataModule):
     def _extract_lra_release(self):
         local_filename = os.path.join(self.data_dir, "lra_release.gz")
 
-        # Extract the tar.gz file
+        # extraction the tar.gz file
         with tarfile.open(local_filename, "r:gz") as tar:
             for member in tqdm(tar.getmembers(), desc="Extracting"):
                 tar.extract(member)
 
-        # Optionally, remove the tar.gz file after extraction
+        # removing the tar.gz file after extraction
         os.remove(local_filename)
 
     def _loading_pipeline(self):
@@ -121,9 +122,9 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.dataset = load_dataset(
             "csv",
             data_files={
-                "train": str(
-                    self.data_dir / "lra_release/listops-1000/basic_train.tsv"
-                ),
+                # "train": str(
+                #     self.data_dir / "lra_release/listops-1000/basic_train.tsv"
+                # ),
                 "val": str(self.data_dir / "lra_release/listops-1000/basic_val.tsv"),
                 "test": str(self.data_dir / "lra_release/listops-1000/basic_test.tsv"),
             },
@@ -138,29 +139,23 @@ class ListOpsDataModule(pl.LightningDataModule):
                 .replace("]", "X")
                 .replace("(", "")
                 .replace(")", "")
-                .split(),
+                .split()[: self.max_length],
                 "Target": input["Target"],
             }
 
         # building vocabulary
+        allowed_characters = string.digits + string.punctuation
 
-        vocab_set = set()
-        vocab_list = []
-
-        for i, data in enumerate(self.dataset["train"]):
-            examples = cleanFeatures(data)
-            examples = examples["Source"]
-            examples = np.reshape(
-                examples, (-1)
-            ).tolist()  # flatten and convert to list
-            vocab_list.extend(examples)
-            vocab_set.update(examples)  # add tokens to the vocabulary set
-        vocab_set.update(self.special_tokens)  # special tokens
-        vocab_set = list(set(vocab_set))
-        vocab_set = sorted(set(vocab_set))  # sort to ensure consistent indexing
-
-        # encoding
-        word_to_number = {word: i + 1 for i, word in enumerate(vocab_set)}
+        word_to_number = {char: i + 7 for i, char in enumerate(allowed_characters)}
+        # reserved tokebns
+        word_to_number["<pad>"] = 0
+        word_to_number["<eos>"] = 1
+        word_to_number["<unk>"] = -1
+        word_to_number["[MAX"] = 2
+        word_to_number["[MIN"] = 3
+        word_to_number["[MED"] = 4
+        word_to_number["[SM"] = 5
+        word_to_number["X"] = 5
 
         def encode_tokens(input):
             tokens = input["Source"]
@@ -183,22 +178,21 @@ class ListOpsDataModule(pl.LightningDataModule):
                 "Target": input["Target"],
             }
 
-        for split in ["train", "val", "test"]:
-            # apply clean close brackets
-            self.dataset[split] = self.dataset[split].map(
-                cleanFeatures,
-                keep_in_memory=True,
-                load_from_cache_file=False,
-                num_proc=self.num_workers,
-            )
+        # apply clean close brackets
+        self.dataset = self.dataset.map(
+            cleanFeatures,
+            keep_in_memory=True,
+            load_from_cache_file=False,
+            num_proc=self.num_workers,
+        )
 
-            # apply encoding
-            self.dataset[split] = self.dataset[split].map(
-                encode_tokens,
-                keep_in_memory=True,
-                load_from_cache_file=False,
-                num_proc=self.num_workers,
-            )
+        # apply encoding
+        self.dataset = self.dataset.map(
+            encode_tokens,
+            keep_in_memory=True,
+            load_from_cache_file=False,
+            num_proc=self.num_workers,
+        )
 
         print(f"Saving dataset to {self.serialized_dataset_path}...")
         self.dataset.save_to_disk(self.serialized_dataset_path)
@@ -243,9 +237,8 @@ class ListOpsDataModule(pl.LightningDataModule):
         if stage == "predict":
             self.test_dataset = self.dataset["test"]
 
-        # batching and padding
+        # batching
         def collate_fn(batch):
-            # print(batch)
             xs, ys = zip(*[(data["Source"], data["Target"]) for data in batch])
             xs = torch.stack([torch.tensor(x) for x in xs])
             xs = xs.unsqueeze(1).float()
