@@ -82,88 +82,85 @@ def conv(
     return get_conv_function(x, kernel, bias, padding=0 if causal else padding, groups=groups, dim=data_dim)
 
 
+# def fftconv(
+#     x: torch.Tensor,
+#     kernel: torch.Tensor,
+#     bias: Optional[torch.Tensor] = None,
+# ) -> torch.Tensor:
+
+#     data_dim = len(x.shape) - 2
+#     # -> [batch_size, channels, x_dimension, y_dimension, ...] -> len[x.shape] = 2 + data_dim
+
+#     assert data_dim == 1
+
+#     kernel_size = torch.tensor(kernel.shape[-data_dim:])
+#     assert torch.all(
+#         kernel_size % 2 != 0
+#     ), f"Convolutional kernels must have odd dimensionality. Received {kernel.shape}"
+
+#     # padding input
+#     padding_x = kernel.shape[-1] // 2
+#     padding_x = (2 * data_dim) * [padding_x]
+
+#     x_padded = F.pad(x, padding_x)
+
+#     if x_padded.shape[-1] % 2 != 0:
+#         x_padded = F.pad(x_padded, [0, 1])
+
+#     # padding kernel
+#     padding_kernel = [
+#         pad
+#         for i in reversed(range(2, x_padded.ndim))
+#         for pad in [0, x_padded.shape[i] - kernel.shape[i]]
+#     ]
+
+#     kernel_padded = F.pad(kernel, padding_kernel, mode="constant", value=0)
+
+#     # Fourier Transform
+#     x_fr = torch.fft.rfftn(x_padded, dim=tuple(range(2, x_padded.ndim)))
+#     kernel_fr = torch.fft.rfftn(kernel_padded, dim=tuple(range(2, kernel.ndim)))
+
+#     # (Input * Conj(Kernel)) = Correlation(Input, Kernel)
+#     # b->batch i->input channel o->output channel , ...> any additional dimensions
+#     # The einsum notation specifies that for each position in the output tensor,
+#     # you perform element-wise multiplication of x_fr and kernel_fr and sum over the i dimension (input channels)
+#     # and any remaining spatial dimensions
+#     # Essentially, it calculates a form of convolution (correlation) in the Fourier domain,
+#     # where the i dimension of x_fr is multiplied with the i dimension of kernel_fr
+#     # and summed to produce the output tensor's o dimension
+#     kernel_fr = torch.conj(kernel_fr)
+#     # Assuming x_fr has shape [batch_size, num_channels, x_dim1, x_dim2, ...]
+#     # and kernel_fr has shape [num_channels, k_dim1, k_dim2, ...]
+#     print(
+#         f"expected_shape : [batch_size, num_channels, x_dim1, x_dim2, ...] , x_fr shape: {x_fr.shape}"
+#     )
+#     print(
+#         f"expected_shape : [num_channels, k_dim1, k_dim2, ...] ,kernel_fr shape: {kernel_fr.shape}"
+#     )
+#     # Element-wise Multiplication in Fourier domain
+#     output_fr = x_fr * kernel_fr
+
+#     # Inverse FFT to transform the result back to the spatial domain
+#     out = torch.fft.irfftn(output_fr, dim=tuple(range(2, x_padded.ndim))).float()
+
+#     # This part of the code ensures that the output tensor out has the same spatial dimensions as the original input tensor x (before padding)
+
+#     # Select all elements in the batch_size and channels dimensions (first two dimensions of out)
+#     slices = [slice(None), slice(None)]
+#     # Extension of the slices list to include slices for each spatial dimension (for all dimensions [data_dim])
+#     # Let's assume x_padded has a shape of [batch_size, channels, height, width]. After this step, slices might look like:
+#     # - slices = [slice(None), slice(None), slice(None, height), slice(None, width)]
+#     slices.extend(slice(None, x.shape[-i]) for i in range(1, data_dim + 1))
+#     # This operation effectively crops the out tensor to remove any padding that was added during the earlier steps
+#     out = out[tuple(slices)]
+
+#     # Add bias if provided
+#     if bias is not None:
+#         out = out + bias.view(1, -1, *([1] * data_dim))
+
+#     return out
+
 def fftconv(
-    x: torch.Tensor,
-    kernel: torch.Tensor,
-    bias: Optional[torch.Tensor] = None,
-) -> torch.Tensor:
-
-    data_dim = len(x.shape) - 2
-    # -> [batch_size, channels, x_dimension, y_dimension, ...] -> len[x.shape] = 2 + data_dim
-
-    assert data_dim == 1
-
-    kernel_size = torch.tensor(kernel.shape[-data_dim:])
-    assert torch.all(
-        kernel_size % 2 != 0
-    ), f"Convolutional kernels must have odd dimensionality. Received {kernel.shape}"
-
-    # padding input
-    padding_x = kernel.shape[-1] // 2
-    padding_x = (2 * data_dim) * [padding_x]
-
-    x_padded = F.pad(x, padding_x)
-
-    if x_padded.shape[-1] % 2 != 0:
-        x_padded = F.pad(x_padded, [0, 1])
-
-    # padding kernel
-    padding_kernel = [
-        pad
-        for i in reversed(range(2, x_padded.ndim))
-        for pad in [0, x_padded.shape[i] - kernel.shape[i]]
-    ]
-
-    kernel_padded = F.pad(kernel, padding_kernel, mode="constant", value=0)
-
-    # Fourier Transform
-    x_fr = torch.fft.rfftn(x_padded, dim=tuple(range(2, x_padded.ndim)))
-    kernel_fr = torch.fft.rfftn(kernel_padded, dim=tuple(range(2, kernel.ndim)))
-
-    # (Input * Conj(Kernel)) = Correlation(Input, Kernel)
-    # b->batch i->input channel o->output channel , ...> any additional dimensions
-    # The einsum notation specifies that for each position in the output tensor,
-    # you perform element-wise multiplication of x_fr and kernel_fr and sum over the i dimension (input channels)
-    # and any remaining spatial dimensions
-    # Essentially, it calculates a form of convolution (correlation) in the Fourier domain,
-    # where the i dimension of x_fr is multiplied with the i dimension of kernel_fr
-    # and summed to produce the output tensor's o dimension
-    kernel_fr = torch.conj(kernel_fr)
-    # Assuming x_fr has shape [batch_size, num_channels, x_dim1, x_dim2, ...]
-    # and kernel_fr has shape [num_channels, k_dim1, k_dim2, ...]
-    print(
-        f"expected_shape : [batch_size, num_channels, x_dim1, x_dim2, ...] , x_fr shape: {x_fr.shape}"
-    )
-    print(
-        f"expected_shape : [num_channels, k_dim1, k_dim2, ...] ,kernel_fr shape: {kernel_fr.shape}"
-    )
-    # Element-wise Multiplication in Fourier domain
-    output_fr = x_fr * kernel_fr
-
-    # Inverse FFT to transform the result back to the spatial domain
-    out = torch.fft.irfftn(output_fr, dim=tuple(range(2, x_padded.ndim))).float()
-
-    # This part of the code ensures that the output tensor out has the same spatial dimensions as the original input tensor x (before padding)
-
-    # Select all elements in the batch_size and channels dimensions (first two dimensions of out)
-    slices = [slice(None), slice(None)]
-    # Extension of the slices list to include slices for each spatial dimension (for all dimensions [data_dim])
-    # Let's assume x_padded has a shape of [batch_size, channels, height, width]. After this step, slices might look like:
-    # - slices = [slice(None), slice(None), slice(None, height), slice(None, width)]
-    slices.extend(slice(None, x.shape[-i]) for i in range(1, data_dim + 1))
-    # This operation effectively crops the out tensor to remove any padding that was added during the earlier steps
-    out = out[tuple(slices)]
-
-    # Add bias if provided
-    if bias is not None:
-        out = out + bias.view(1, -1, *([1] * data_dim))
-
-    return out
-
-
-
-
-def fftconv1d(
     x: torch.Tensor,
     kernel: torch.Tensor,
     bias: Optional[torch.Tensor] = None,
@@ -179,9 +176,8 @@ def fftconv1d(
     """
 
     data_dim = len(x.shape) - 2
-    assert data_dim == 1
 
-    kernel_size = torch.tensor(kernel.shape[-data_dim:])
+    assert data_dim == 1
 
     x_shape = x.shape
 
@@ -207,4 +203,5 @@ def fftconv1d(
     # 6. Optionally, add a bias term before returning.
     if bias is not None:
         out = out + bias.view(1, -1, 1)
+        
     return out
