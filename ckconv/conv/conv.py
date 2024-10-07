@@ -161,3 +161,50 @@ def fftconv(
     return out
 
 
+
+
+def fftconv1d(
+    x: torch.Tensor,
+    kernel: torch.Tensor,
+    bias: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    """
+    Args:
+        x: (Tensor) Input tensor to be convolved with the kernel.
+        kernel: (Tensor) Convolution kernel.
+        bias: (Optional, Tensor) Bias tensor to add to the output.
+        padding: (int) Number of zero samples to pad the input on the last dimension.
+    Returns:
+        (Tensor) Convolved tensor
+    """
+
+    data_dim = len(x.shape) - 2
+    assert data_dim == 1
+
+    kernel_size = torch.tensor(kernel.shape[-data_dim:])
+
+    x_shape = x.shape
+
+    # 1. Handle padding
+    # pad the input to the left
+    x = F.pad(x, [kernel.shape[-1] - 1, 0], value=0.0)
+
+    # 2. Pad the kernel tensor to make them equally big. Required for fft.
+    kernel = F.pad(kernel, [0, x.size(-1) - kernel.size(-1)])
+
+    # 3. Perform fourier transform
+    x_fr = torch.fft.rfft(x, dim=-1)
+    kernel_fr = torch.conj(torch.fft.rfft(kernel, dim=-1))
+
+    # 4. Multiply the transformed matrices:
+    # (Input * Conj(Kernel)) = Correlation(Input, Kernel)
+    output_fr = kernel_fr * x_fr
+
+    # 5. Compute inverse FFT, and remove extra padded values
+    # Once we are back in the spatial domain, we can go back to float precision, if double used.
+    out = torch.fft.irfft(output_fr, dim=-1)[..., : x_shape[-1]]
+
+    # 6. Optionally, add a bias term before returning.
+    if bias is not None:
+        out = out + bias.view(1, -1, 1)
+    return out
