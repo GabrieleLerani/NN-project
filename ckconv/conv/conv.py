@@ -165,43 +165,39 @@ def fftconv(
     kernel: torch.Tensor,
     bias: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
-    """
-    Args:
-        x: (Tensor) Input tensor to be convolved with the kernel.
-        kernel: (Tensor) Convolution kernel.
-        bias: (Optional, Tensor) Bias tensor to add to the output.
-        padding: (int) Number of zero samples to pad the input on the last dimension.
-    Returns:
-        (Tensor) Convolved tensor
-    """
 
     data_dim = len(x.shape) - 2
+    # -> [batch_size, channels, x_dimension, y_dimension, ...] -> len[x.shape] = 2 + data_dim
 
     assert data_dim == 1
 
-    x_shape = x.shape
-
-    # 1. Handle padding
     # pad the input to the left
-    x = F.pad(x, [kernel.shape[-1] - 1, 0], value=0.0)
+    x_padded = F.pad(x, [kernel.shape[-1] - 1, 0], value=0.0)
 
-    # 2. Pad the kernel tensor to make them equally big. Required for fft.
-    kernel = F.pad(kernel, [0, x.size(-1) - kernel.size(-1)])
+    if x_padded.shape[-1] % 2 == 0:
+        x_padded = F.pad(x_padded, [1, 0])
 
-    # 3. Perform fourier transform
-    x_fr = torch.fft.rfft(x, dim=-1)
-    kernel_fr = torch.conj(torch.fft.rfft(kernel, dim=-1))
+    # padding kernel
+    kernel_padded = F.pad(kernel, [0, x.size(-1) - kernel.size(-1)])
 
-    # 4. Multiply the transformed matrices:
+    # Fourier Transform
+    x_fr = torch.fft.rfft(x_padded, dim=-1)
+
     # (Input * Conj(Kernel)) = Correlation(Input, Kernel)
-    output_fr = kernel_fr * x_fr
+    # b->batch i->input channel o->output channel , ...> any additional dimensions
+    kernel_fr = torch.conj(torch.fft.rfft(kernel_padded, dim=-1))
 
-    # 5. Compute inverse FFT, and remove extra padded values
-    # Once we are back in the spatial domain, we can go back to float precision, if double used.
-    out = torch.fft.irfft(output_fr, dim=-1)[..., : x_shape[-1]]
+    # Element-wise Multiplication in Fourier domain
+    output_fr = x_fr * kernel_fr
 
-    # 6. Optionally, add a bias term before returning.
+    # Inverse FFT to transform the result back to the spatial domain
+    out = torch.fft.irfftn(output_fr, dim=tuple(range(2, x_padded.ndim))).float()
+
+    # This part of the code ensures that the output tensor out has the same spatial dimensions as the original input tensor x (before padding)
+    out = torch.fft.irfft(output_fr, dim=-1)[..., : x.shape[-1]]
+
+    # Add bias if provided
     if bias is not None:
-        out = out + bias.view(1, -1, 1)
-        
+        out = out + bias.view(1, -1, *([1] * data_dim))
+
     return out
