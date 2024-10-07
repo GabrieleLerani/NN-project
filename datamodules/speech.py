@@ -86,6 +86,7 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
         OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
         OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
+        OmegaConf.update(self.cfg, "kernel.kernel_size", -1)
 
         # 140 and 380 hidden_channels have same parameters
         if self.type == "speech_raw":

@@ -44,12 +44,13 @@ class STL10DataModule(pl.LightningDataModule):
         if hidden_channels == 140:
             OmegaConf.update(self.cfg, "train.learning_rate", 0.02)            
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
+            OmegaConf.update(self.cfg, "kernel.kernel_size", 33)
             
             
         elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.learning_rate", 0.01)            
             OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
-            
+            OmegaConf.update(self.cfg, "kernel.kernel_size", 31)
             
 
     def setup(self, stage: str):

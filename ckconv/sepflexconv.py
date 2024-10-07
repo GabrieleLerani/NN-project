@@ -141,7 +141,7 @@ class SepFlexConv(nn.Module):
         """
 
         # 1. Get the relative positions
-        kernel_positions = self.get_rel_positions()
+        kernel_positions = self.get_rel_positions(x)
 
         # 2 Re-weight the output layer of the kernel net
         self.KernelNet.re_weight_output_layer(
@@ -163,7 +163,7 @@ class SepFlexConv(nn.Module):
 
         return conv_kernel * mask
     
-    def get_rel_positions(self):
+    def get_rel_positions(self, x):
         """
         Handles the vector or relative positions which is given to KernelNet.
         This method is responsible for creating and managing the kernel positions used in the convolution process.
@@ -179,8 +179,10 @@ class SepFlexConv(nn.Module):
             self.kernel_positions.shape[-1] == 1  # Only for the first time
         ):  # The conv. receives input signals of length > 1
 
-            # Creates the vector of relative positions
+            if self.kernel_size == -1:
+                self.kernel_size = x.shape[-1]
 
+            # Creates the vector of relative positions
             kernel_positions = create_coordinates(
                 kernel_size=self.kernel_size,
                 data_dim=self.data_dim,

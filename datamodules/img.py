@@ -84,6 +84,7 @@ class ImageDataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2085.43)
                 OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
+                OmegaConf.update(self.cfg, "kernel.kernel_size", 33)
 
             elif self.type == "s_image":
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
@@ -91,6 +92,7 @@ class ImageDataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 4005.15)
+                OmegaConf.update(self.cfg, "kernel.kernel_size", -1)
 
         elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
@@ -100,11 +102,14 @@ class ImageDataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2306.08)
+                OmegaConf.update(self.cfg, "kernel.kernel_size", 33)
+
             elif self.type == "s_image":
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 4005.15)
+                OmegaConf.update(self.cfg, "kernel.kernel_size", -1)
 
     def prepare_data(self):
         if not self.data_dir.is_dir():

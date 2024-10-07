@@ -59,6 +59,7 @@ class MnistDataModule(pl.LightningDataModule):
         OmegaConf.update(self.cfg, "net.in_channels", 1)
         OmegaConf.update(self.cfg, "net.out_channels", 10)
         OmegaConf.update(self.cfg, "net.data_dim", 1)
+        OmegaConf.update(self.cfg, "kernel.kernel_size", -1)
 
         if hidden_channels == 140:
             if self.type == "s_mnist":

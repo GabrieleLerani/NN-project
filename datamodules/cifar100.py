@@ -46,11 +46,13 @@ class Cifar100DataModule(pl.LightningDataModule):
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
             OmegaConf.update(self.cfg, "train.weight_decay", 0.0001)
             OmegaConf.update(self.cfg, "kernel.omega_0", 3521.55)
+            OmegaConf.update(self.cfg, "kernel.kernel_size", 33)
             
         elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
             OmegaConf.update(self.cfg, "kernel.omega_0", 679.14)
+            OmegaConf.update(self.cfg, "kernel.kernel_size", 31)
             
 
     def setup(self, stage: str):

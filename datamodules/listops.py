@@ -53,6 +53,7 @@ class ListOpsDataModule(pl.LightningDataModule):
         OmegaConf.update(self.cfg, "train.learning_rate", 0.001)
         OmegaConf.update(self.cfg, "kernel.omega_0", 784.66)
         OmegaConf.update(self.cfg, "net.data_dim", 1)
+        OmegaConf.update(self.cfg, "kernel.kernel_size", -1)
 
         if hidden_channels == 140:
             OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
