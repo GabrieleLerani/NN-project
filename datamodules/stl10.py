@@ -54,7 +54,6 @@ class STL10DataModule(pl.LightningDataModule):
             
 
     def setup(self, stage: str):
-
         self.batch_size = self.cfg.train.batch_size
 
         # Assign train/val datasets for use in dataloaders

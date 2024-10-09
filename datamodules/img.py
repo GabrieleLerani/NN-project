@@ -36,7 +36,6 @@ class ImageDataModule(pl.LightningDataModule):
         # Save parameters to self
         self.data_dir = Path(data_dir) / "IMG_LRA"
         self.num_workers = 7
-        self.batch_size = cfg.train.batch_size
         self.serialized_dataset_path = os.path.join(
             self.data_dir, "preprocessed_dataset_img_lra"
         )
@@ -118,6 +117,8 @@ class ImageDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str):
         self._set_transform()
+
+        self.batch_size = self.cfg.train.batch_size
 
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":

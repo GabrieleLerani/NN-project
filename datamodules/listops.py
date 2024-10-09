@@ -38,7 +38,7 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(
             42
         )
-        self.batch_size = cfg.train.batch_size
+
 
     def _set_transform(self):
         self.transform = transforms.Compose([transforms.ToTensor()])
@@ -144,19 +144,31 @@ class ListOpsDataModule(pl.LightningDataModule):
                 "Target": input["Target"],
             }
 
-        # building vocabulary
-        allowed_characters = string.digits + string.punctuation
+        def w_tokenize(input):
+            return {
+                "Source": word_tokenize(input["Source"])[: self.max_length],
+                "Target": input["Target"],
+            }
 
-        word_to_number = {char: i + 7 for i, char in enumerate(allowed_characters)}
-        # reserved tokebns
-        word_to_number["<pad>"] = 0
-        word_to_number["<eos>"] = 1
-        word_to_number["<unk>"] = -1
-        word_to_number["[MAX"] = 2
-        word_to_number["[MIN"] = 3
-        word_to_number["[MED"] = 4
-        word_to_number["[SM"] = 5
-        word_to_number["X"] = 5
+        tokenizer = w_tokenize
+
+        # building vocabulary
+        vocab_set = set()
+
+        with tqdm(total=len(self.dataset["train"]), desc='Vocabulary construction') as progress_bar:
+            for i, data in enumerate(self.dataset["train"]):
+                examples = tokenizer(data)
+                examples = examples["Source"]
+                vocab_set.update(examples)  # add tokens to the vocabulary set
+                progress_bar.update(1)
+
+        vocab_set.update(self.special_tokens)  # special tokens
+        vocab_set = list(set(vocab_set))
+        # vocab_set = vocab_set.sort()
+        print(vocab_set)
+
+        # encoding
+        word_to_number = {word: i + 1 for i, word in enumerate(vocab_set)}
 
         def encode_tokens(input):
             tokens = input["Source"]
@@ -212,6 +224,7 @@ class ListOpsDataModule(pl.LightningDataModule):
                 print("Zip already downloaded. Skipping download.")
 
     def setup(self, stage):
+        self.batch_size = self.cfg.train.batch_size
 
         # if already done load the preprocessed dataset
         if os.path.exists(self.serialized_dataset_path):
