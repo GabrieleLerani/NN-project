@@ -13,8 +13,6 @@ from torch.utils.data import Dataset
 
 
 from pathlib import Path
-from torchvision import transforms
-
 
 class TensorDataset(Dataset):
     def __init__(self, X, Y):
@@ -110,9 +108,10 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         class_num = 0
         for foldername in self.selected_dirs:
             loc = os.path.join(self.speech_dir, foldername)
+            print(loc)
             for filename in os.listdir(loc):
                 audio, _ = torchaudio.load(
-                    os.path.join(loc, filename), channels_first=False
+                    os.path.join(loc, filename), channels_first=False,format="wav"
                 )
 
                 if audio.size(0) != 16000:
@@ -182,17 +181,17 @@ class SpeechCommandsDataModule(L.LightningDataModule):
             torch.stack([y for _, y in normalized_train_data]),
         )
 
-        # Convert splits to Hugging Face datasets
-        self.dataset = DatasetDict(
-            {
-                "train": self.train_dataset,
-                "val": self.val_dataset,
-                "test": self.test_dataset,
-            }
-        )
+        # # Convert splits to Hugging Face datasets
+        # self.dataset = DatasetDict(
+        #     {
+        #         "train": self.train_dataset,
+        #         "val": self.val_dataset,
+        #         "test": self.test_dataset,
+        #     }
+        # )
 
-        # Save to disk
-        torch.save(self.dataset, self.serialized_dataset_path)
+        # # Save to disk
+        # torch.save(self.dataset, self.serialized_dataset_path)
 
     def prepare_data(self):
         if not self.data_dir.is_dir():
@@ -207,28 +206,11 @@ class SpeechCommandsDataModule(L.LightningDataModule):
 
     def setup(self, stage: str):
 
-        # if already done load the preprocessed dataset
-        if os.path.exists(self.serialized_dataset_path):
-            print(f"Loading dataset from {self.serialized_dataset_path}...")
-            self.dataset = torch.load(self.serialized_dataset_path)
-        else:
-            # pipeline to load data
-            self._loading_pipeline()
-
-        # assign train/val datasets for use in dataloaders
-        if stage == "fit":
-
-            self.train_dataset, self.val_dataset = (
-                self.dataset["train"],
-                self.dataset["val"],
-            )
-
-        if stage == "test":
-            self.test_dataset = self.dataset["test"]
+        self._loading_pipeline()
 
     def train_dataloader(self):
         return DataLoader(
-            self.train_dataset,
+            self._train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=False,
