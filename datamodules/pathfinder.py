@@ -197,11 +197,13 @@ class PathfinderDataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 1239.14)
+                OmegaConf.update(self.cfg, "kernel.kernel_size", 33)
 
             elif self.type == "sequential":
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2272.56)
+                OmegaConf.update(self.cfg, "kernel.kernel_size", -1)
 
         elif hidden_channels == 380:
 
@@ -210,12 +212,14 @@ class PathfinderDataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.weight_decay", 0)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 3908.32)
+                OmegaConf.update(self.cfg, "kernel.kernel_size", 33)
 
             elif self.type == "sequential":
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2272.56)
+                OmegaConf.update(self.cfg, "kernel.kernel_size", -1)
 
     def train_dataloader(self):
         train_dataloader = DataLoader(

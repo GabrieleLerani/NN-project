@@ -54,11 +54,14 @@ class Cifar10DataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.weight_decay", 0.0001)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 1435.77)
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
+                OmegaConf.update(self.cfg, "kernel.kernel_size", 33)
             elif self.type == "s_cifar10":
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.0)
                 OmegaConf.update(self.cfg, "train.weight_decay", 0)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2386.49)
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
+                OmegaConf.update(self.cfg, "kernel.kernel_size", -1)
+
         elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
 
@@ -67,11 +70,14 @@ class Cifar10DataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.15)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 1435.77)
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
+                OmegaConf.update(self.cfg, "kernel.kernel_size", 31)
+
             elif self.type == "s_cifar10":
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.25)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 4005.15)
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
+                OmegaConf.update(self.cfg, "kernel.kernel_size", -1)
 
 
     def setup(self, stage: str):

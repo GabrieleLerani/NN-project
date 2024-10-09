@@ -63,10 +63,8 @@ class TextDataModule(pl.LightningDataModule):
         self.cfg = cfg
 
         self._yaml_parameters()
-        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(
-            42
-        )
-        self.batch_size = cfg.train.batch_size
+        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(42)
+
 
     def _set_transform(self):
 
@@ -85,6 +83,7 @@ class TextDataModule(pl.LightningDataModule):
         OmegaConf.update(self.cfg, "net.out_channels", 2)
         OmegaConf.update(self.cfg, "kernel.omega_0", 2966.60)
         OmegaConf.update(self.cfg, "net.data_dim", 1)
+        OmegaConf.update(self.cfg, "kernel.kernel_size", -1)
 
         if hidden_channels == 140:
             OmegaConf.update(self.cfg, "train.weight_decay", 1e-5)
@@ -257,6 +256,7 @@ class TextDataModule(pl.LightningDataModule):
         self.dataset.save_to_disk(self.serialized_dataset_path)
 
     def setup(self, stage):
+        self.batch_size = self.cfg.train.batch_size
 
         # if already done load the preprocessed dataset
         if os.path.exists(self.serialized_dataset_path):

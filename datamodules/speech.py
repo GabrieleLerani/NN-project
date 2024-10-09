@@ -39,7 +39,6 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         # Save parameters to self
         self.data_dir = Path(data_dir) / "SPEECH"
         self.num_workers = 7
-        self.batch_size = cfg.train.batch_size
         self.serialized_dataset_path = os.path.join(
             self.data_dir, "preprocessed_dataset_speech.pth"
         )
@@ -68,6 +67,7 @@ class SpeechCommandsDataModule(L.LightningDataModule):
 
         assert self.type in ["speech_raw", "speech_mfcc"]
         self.cfg = cfg
+        self.generator = torch.Generator(self.cfg.train.accelerator).manual_seed(42)
 
         self._yaml_parameters()
         self._set_transform()
@@ -84,6 +84,7 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
         OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
         OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
+        OmegaConf.update(self.cfg, "kernel.kernel_size", -1)
 
         # 140 and 380 hidden_channels have same parameters
         if self.type == "speech_raw":
@@ -161,9 +162,7 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         self.train_dataset, self.val_dataset, self.test_dataset = random_split(
             tensor_dataset,
             [train_len, val_len, test_len],
-            generator=torch.Generator(self.cfg.train.accelerator).manual_seed(
-                getattr(self, "seed", 42)
-            ),
+            generator=self.generator,
         )
 
         # cropping train_X for normalization
@@ -205,6 +204,7 @@ class SpeechCommandsDataModule(L.LightningDataModule):
                 print(f"Error initializing SPEECHCOMMANDS: {e}")
 
     def setup(self, stage: str):
+        self.batch_size = self.cfg.train.batch_size
 
         self._loading_pipeline()
 
@@ -213,7 +213,8 @@ class SpeechCommandsDataModule(L.LightningDataModule):
             self._train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            shuffle=False,
+            shuffle=True,
+            generator=self.generator
         )
 
     def val_dataloader(self):
