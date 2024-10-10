@@ -134,16 +134,6 @@ class ListOpsDataModule(pl.LightningDataModule):
         )
         self.dataset.set_format(type="torch", columns=["Source", "Target"])
 
-        def cleanFeatures(input):
-            return {
-                "Source": input["Source"]
-                .replace("]", "X")
-                .replace("(", "")
-                .replace(")", "")
-                .split()[: self.max_length],
-                "Target": input["Target"],
-            }
-
         def w_tokenize(input):
             return {
                 "Source": word_tokenize(input["Source"])[: self.max_length],
@@ -193,7 +183,7 @@ class ListOpsDataModule(pl.LightningDataModule):
 
         # apply clean close brackets
         self.dataset = self.dataset.map(
-            cleanFeatures,
+            tokenizer,
             keep_in_memory=True,
             load_from_cache_file=False,
             num_proc=self.num_workers,
