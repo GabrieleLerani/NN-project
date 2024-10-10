@@ -180,17 +180,17 @@ class SpeechCommandsDataModule(L.LightningDataModule):
             torch.stack([y for _, y in normalized_train_data]),
         )
 
-        # # Convert splits to Hugging Face datasets
-        # self.dataset = DatasetDict(
-        #     {
-        #         "train": self.train_dataset,
-        #         "val": self.val_dataset,
-        #         "test": self.test_dataset,
-        #     }
-        # )
+        # Convert splits to Hugging Face datasets
+        self.dataset = DatasetDict(
+            {
+                "train": self.train_dataset,
+                "val": self.val_dataset,
+                "test": self.test_dataset,
+            }
+        )
 
-        # # Save to disk
-        # torch.save(self.dataset, self.serialized_dataset_path)
+        # Save to disk
+        torch.save(self.dataset, self.serialized_dataset_path)
 
     def prepare_data(self):
         if not self.data_dir.is_dir():
@@ -206,11 +206,26 @@ class SpeechCommandsDataModule(L.LightningDataModule):
     def setup(self, stage: str):
         self.batch_size = self.cfg.train.batch_size
 
-        self._loading_pipeline()
+        # if already done load the preprocessed dataset
+        if os.path.exists(self.serialized_dataset_path):
+            print(f"Loading dataset from {self.serialized_dataset_path}...")
+            self.dataset = torch.load(self.serialized_dataset_path)
+        else:
+            # pipeline to load data
+            self._loading_pipeline()
+
+        # assign train/val datasets for use in dataloaders
+        if stage == "fit":
+
+            self.train_dataset = self.dataset["train"]
+            self.val_dataset = self.dataset["val"]
+
+        if stage == "test":
+            self.test_dataset = self.dataset["test"]
 
     def train_dataloader(self):
         return DataLoader(
-            self._train_dataset,
+            self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=True,

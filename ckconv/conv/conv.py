@@ -64,9 +64,6 @@ def conv(
     # -> [batch_size, channels, x_dimension, y_dimension, ...] -> len[x.shape] = 2 + data_dim
 
     kernel_size = torch.tensor(kernel.shape[-data_dim:])
-    assert torch.all(
-        kernel_size % 2 != 0
-    ), f"Convolutional kernels must have odd dimensionality. Received {kernel.shape}"
     # pad by kernel_size // 2 so that the output has the same size as the input
     padding = (kernel_size // 2).tolist() 
 
