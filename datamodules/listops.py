@@ -39,7 +39,6 @@ class ListOpsDataModule(pl.LightningDataModule):
             42
         )
 
-
     def _set_transform(self):
         self.transform = transforms.Compose([transforms.ToTensor()])
 
@@ -123,9 +122,9 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.dataset = load_dataset(
             "csv",
             data_files={
-                # "train": str(
-                #     self.data_dir / "lra_release/listops-1000/basic_train.tsv"
-                # ),
+                "train": str(
+                    self.data_dir / "lra_release/listops-1000/basic_train.tsv"
+                ),
                 "val": str(self.data_dir / "lra_release/listops-1000/basic_val.tsv"),
                 "test": str(self.data_dir / "lra_release/listops-1000/basic_test.tsv"),
             },
@@ -145,7 +144,9 @@ class ListOpsDataModule(pl.LightningDataModule):
         # building vocabulary
         vocab_set = set()
 
-        with tqdm(total=len(self.dataset["train"]), desc='Vocabulary construction') as progress_bar:
+        with tqdm(
+            total=len(self.dataset["train"]), desc="Vocabulary construction"
+        ) as progress_bar:
             for i, data in enumerate(self.dataset["train"]):
                 examples = tokenizer(data)
                 examples = examples["Source"]
