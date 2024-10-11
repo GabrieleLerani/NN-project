@@ -19,7 +19,7 @@ import os
 # In order for Hydra to generate again the files, go to config/config.yaml and look for defaults: and hydra:
 @hydra.main(version_base=None, config_path="config", config_name="config")
 def main(cfg: OmegaConf) -> None:
-    # 0. set device
+    # 0. Set device
     torch.set_default_device(cfg.train.accelerator)
 
     # 1. Create the dataset
@@ -57,34 +57,43 @@ def setup_trainer_components(cfg: OmegaConf):
     # Setup callbacks
     callbacks = []
     if cfg.train.callbacks:
-        # create checkpoints folder
+        # Create checkpoints folder
         os.makedirs(f"checkpoints", exist_ok=True)
         path = os.path.join("checkpoints", filename)
         os.makedirs(path, exist_ok=True)
-
+        
+        # Create top checkpoint folder
         path_top = os.path.join(path, "top")
         os.makedirs(path_top, exist_ok=True)
+        # Setup top checkpoint callback
         checkpoint_top_callback = ModelCheckpoint(
-            monitor="accuracy",
+            monitor="val_accuracy",
             dirpath=path_top,
             save_top_k=1,
             every_n_epochs=1,
             mode="max",
         )
+        # Create last checkpoint folder
         path_last = os.path.join(path, "last")
         os.makedirs(path_last, exist_ok=True)
+        # Setup last checkpoint callback
         checkpoint_last_callback = ModelCheckpoint(
             dirpath=path_last,
             every_n_epochs=1,
         )
+        # Setup early stopping callback
         early_stop_callback = EarlyStopping(
             monitor="val_loss",
             patience=cfg.train.max_epoch_no_improvement,
             verbose=True,
         )
+        # Setup model summary callback
         model_summary_callback = ModelSummary(max_depth=-1)
+        # Setup kernel logger callback
         kernel_logger_callback = KernelLogger(filename)
+        # Setup learning rate scheduler callback
         learning_rate_callback = LearningRateMonitor(logging_interval="step")
+
         callbacks.extend(
             [
                 kernel_logger_callback,
@@ -126,15 +135,11 @@ def create_trainer(
         max_epochs=cfg.train.epochs,
         callbacks=callbacks,
         profiler=profiler,
-        # TODO used for testing
-        # limit_train_batches=30,
-        # limit_val_batches=30,
-        # limit_test_batches=30
     )
 
 
 def train(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:
-    # start new training
+    # Start new training
     if not cfg.load_model.pre_trained or not exists_checkpoint_path(cfg):
         trainer.fit(model=model, datamodule=datamodule)
     # Load the model from a checkpoint
@@ -143,9 +148,7 @@ def train(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:
             model=model, datamodule=datamodule, ckpt_path=get_checkpoint_path(cfg)
         )
 
-    trainer.validate(
-        model=model, datamodule=datamodule, ckpt_path=get_checkpoint_path(cfg)
-    )
+    trainer.validate(model=model, datamodule=datamodule, ckpt_path=get_checkpoint_path(cfg))
     trainer.test(model=model, datamodule=datamodule, ckpt_path=get_checkpoint_path(cfg))
 
 
@@ -156,7 +159,6 @@ def get_checkpoint_path(cfg: OmegaConf) -> str:
         path = os.path.join(path, "last")
     elif cfg.load_model.model == "top":
         path = os.path.join(path, "top")
-    # there should be only one file
     files = os.listdir(path)
     checkpoint_path = os.path.join(path, files[0])
 
@@ -172,7 +174,6 @@ def exists_checkpoint_path(cfg: OmegaConf) -> str:
         path = os.path.join(path, "last")
     elif cfg.load_model.model == "top":
         path = os.path.join(path, "top")
-    # there should be only one file
     files = os.listdir(path)
     if len(files) > 0:
         return True

@@ -1,22 +1,14 @@
 from torchvision import transforms
 import pytorch_lightning as pl
 from torch.utils.data import random_split
-
-
-from datasets import load_dataset, DatasetDict
 from torchvision.datasets import CIFAR10
-from torchvision.transforms import functional as F
-
 from omegaconf import OmegaConf
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 import os
 import torch
 from pathlib import Path
-from datasets import load_dataset, DatasetDict
 from omegaconf import OmegaConf
-import numpy as np
-from nltk.tokenize import word_tokenize
 
 
 class ImageDataModule(pl.LightningDataModule):
@@ -33,20 +25,22 @@ class ImageDataModule(pl.LightningDataModule):
 
         super().__init__()
 
+        self.cfg = cfg
+
         # Save parameters to self
         self.data_dir = Path(data_dir) / "IMG_LRA"
-        self.num_workers = 7
+        self.num_workers = 0
+        self.generator = torch.Generator(self.cfg.train.accelerator).manual_seed(42)
         self.serialized_dataset_path = os.path.join(
             self.data_dir, "preprocessed_dataset_img_lra"
         )
 
         self.val_split = 0.1
 
-        # Determine data_type
-        self.type = cfg.data.dataset
-        self.cfg = cfg
+        self.type = self.cfg.data.dataset
 
         self._yaml_parameters()
+
 
     def _set_transform(self):
 
@@ -63,9 +57,10 @@ class ImageDataModule(pl.LightningDataModule):
             ]
         )
         if self.type == "s_image":
+            # Flatten the image to 1024 pixels
             self.transform.transforms.append(
                 transforms.Lambda(lambda x: x.view(1, -1))
-            )  # flatten the image to 1024 pixels
+            )
 
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
@@ -102,7 +97,6 @@ class ImageDataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2306.08)
                 OmegaConf.update(self.cfg, "kernel.kernel_size", 33)
-
             elif self.type == "s_image":
                 OmegaConf.update(self.cfg, "net.data_dim", 1)
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
@@ -111,9 +105,9 @@ class ImageDataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "kernel.kernel_size", -1)
 
     def prepare_data(self):
-        if not self.data_dir.is_dir():
-            CIFAR10(self.data_dir, train=True, download=True)
-            CIFAR10(self.data_dir, train=False, download=True)
+        # Download
+        CIFAR10(self.data_dir, train=True, download=True)
+        CIFAR10(self.data_dir, train=False, download=True)
 
     def setup(self, stage: str):
         self._set_transform()
@@ -126,10 +120,12 @@ class ImageDataModule(pl.LightningDataModule):
 
         # Assign test dataset for use in dataloader(s)
         if stage == "test":
-            self.test_dataset = CIFAR10(
-                self.data_dir, train=False, transform=self.transform
-            )
-            # print(f'Test set size: {len(self.cifar10_test)}')
+            self.test_dataset = CIFAR10(self.data_dir, train=False, transform=self.transform)
+            print(f'Test set size: {len(self.cifar10_test)}')
+
+        if stage == "predict":
+            self.test_dataset = CIFAR10(self.data_dir, train=False)
+            print(f"Prediction set size: {len(self.cifar10_predict)}")
 
     def _get_train_dataset(self):
         FULL_TRAIN_SIZE = 45000
@@ -140,25 +136,10 @@ class ImageDataModule(pl.LightningDataModule):
         train_full, val_full = random_split(
             self.cifar10_full,
             [FULL_TRAIN_SIZE, FULL_VAL_SIZE],
-            generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+            generator=self.generator,
         )
 
-        if self.cfg.data.reduced_dataset:
-            REDUCED_TRAIN_SIZE = 500
-            REDUCED_VAL_SIZE = 100
-
-            train, _ = random_split(
-                train_full,
-                [REDUCED_TRAIN_SIZE, FULL_TRAIN_SIZE - REDUCED_TRAIN_SIZE],
-                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
-            )
-            val, _ = random_split(
-                val_full,
-                [REDUCED_VAL_SIZE, FULL_VAL_SIZE - REDUCED_VAL_SIZE],
-                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
-            )
-        else:
-            train, val = train_full, val_full
+        train, val = train_full, val_full
 
         print(f"Training set size: {len(train)}")
         print(f"Validation set size: {len(val)}")
@@ -169,7 +150,7 @@ class ImageDataModule(pl.LightningDataModule):
             self.train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
-            drop_last=True,
+            generator=self.generator,
         )
 
     def val_dataloader(self):
@@ -186,19 +167,9 @@ class ImageDataModule(pl.LightningDataModule):
             shuffle=False,
         )
 
-
-if __name__ == "__main__":
-
-    cfg = OmegaConf.load("config/config.yaml")
-
-    dm = ImageDataModule(
-        cfg=cfg,
-        data_dir="data/datasets",
-    )
-    dm.prepare_data()
-    dm.setup(stage="fit")
-    train_loader = dm.train_dataloader()
-
-    for images, labels in train_loader:
-        print(f"Batch of images shape: {images.shape} {labels.shape}")
-        break
+    def predict_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+        )

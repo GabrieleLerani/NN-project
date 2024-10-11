@@ -12,19 +12,18 @@ class S4Block(nn.Module):
           input
             |
     | -------------|
-    |            BarchNorm             
-    |            SepFlexConv             
-    |            GELU     
-    |            DropOut          
-    |            PointwiseLinear                
-    |            GELU             
+    |            BarchNorm
+    |            SepFlecConv
+    |            GELU
+    |            DropOut
+    |            PointwiseLinear
+    |            GELU
     |              |
     |---->(+)<-----|
            |
         output
 
     """
-
 
     def __init__(
             self,
@@ -42,7 +41,7 @@ class S4Block(nn.Module):
 
         self.batch_norm_layer = GetBatchNormalization(data_dim=data_dim, num_features=in_channels)
 
-        # separable flexible convolutional layer
+        # Separable flexible convolutional layer
         self.sep_flex_conv_layer = SepFlexConv(
             data_dim=data_dim,
             in_channels=in_channels,
@@ -54,7 +53,7 @@ class S4Block(nn.Module):
 
         self.dropout_layer = GetDropout(data_dim=data_dim, p=dropout)
 
-        # pointwise linear convolutional layer
+        # Pointwise linear convolutional layer
         self.pointwise_linear_layer = LinearLayer(data_dim, in_channels, out_channels)
 
         self.seq_modules = nn.Sequential(
@@ -66,7 +65,7 @@ class S4Block(nn.Module):
             self.gelu_layer[1]
         )
 
-        # init last linear layer
+        # Init last linear layer
         nn.init.kaiming_normal_(self.pointwise_linear_layer.layer.weight)
         self.pointwise_linear_layer.layer.bias.data.fill_(0.0)
 
@@ -84,7 +83,8 @@ class S4Block(nn.Module):
 
     def forward(self, x):
         """
-        Standard method of nn.modules we embed also the residual connection
+        Standard method of nn.modules
+        We embed also the residual connection
         """
         shortcut = self.shortcut(x)
         out = self.seq_modules(x)

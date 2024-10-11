@@ -14,7 +14,7 @@ class Cifar100DataModule(pl.LightningDataModule):
         self.data_dir = data_dir
         self.type = cfg.data.dataset
         self.cfg = cfg
-        self.num_workers = 0 # for google colab training
+        self.num_workers = 0
         self.transform = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Normalize(
@@ -27,16 +27,16 @@ class Cifar100DataModule(pl.LightningDataModule):
 
 
     def prepare_data(self):
-        # download
+        # Download
         CIFAR100(self.data_dir, train=True, download=True)
-        CIFAR100(self.data_dir, train=False, download=True)     
-        
+        CIFAR100(self.data_dir, train=False, download=True)
+
 
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
 
         OmegaConf.update(self.cfg, "train.batch_size", 50)
-        OmegaConf.update(self.cfg, "train.epochs", 210)
+        OmegaConf.update(self.cfg, "train.epochs", 80)
         OmegaConf.update(self.cfg, "net.in_channels", 3)
         OmegaConf.update(self.cfg, "net.out_channels", 100)
         OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
@@ -47,19 +47,20 @@ class Cifar100DataModule(pl.LightningDataModule):
             OmegaConf.update(self.cfg, "train.weight_decay", 0.0001)
             OmegaConf.update(self.cfg, "kernel.omega_0", 3521.55)
             OmegaConf.update(self.cfg, "kernel.kernel_size", 33)
-            
+
         elif hidden_channels == 380:
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
             OmegaConf.update(self.cfg, "kernel.omega_0", 679.14)
             OmegaConf.update(self.cfg, "kernel.kernel_size", 31)
-            
+
 
     def setup(self, stage: str):
         self.batch_size = self.cfg.train.batch_size
-    
+
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
+
             self.cifar100_train, self.cifar100_val = self._get_train_dataset()
 
         # Assign test dataset for use in dataloader(s)
@@ -84,22 +85,7 @@ class Cifar100DataModule(pl.LightningDataModule):
             generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
         )
 
-        if self.cfg.data.reduced_dataset:
-            REDUCED_TRAIN_SIZE = 500
-            REDUCED_VAL_SIZE = 100
-
-            train, _ = random_split(
-                train_full,
-                [REDUCED_TRAIN_SIZE, FULL_TRAIN_SIZE - REDUCED_TRAIN_SIZE],
-                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
-            )
-            val, _ = random_split(
-                val_full,
-                [REDUCED_VAL_SIZE, FULL_VAL_SIZE - REDUCED_VAL_SIZE],
-                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
-            )
-        else:
-            train, val = train_full, val_full
+        train, val = train_full, val_full
 
         print(f"Training set size: {len(train)}")
         print(f"Validation set size: {len(val)}")
@@ -107,7 +93,7 @@ class Cifar100DataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         return DataLoader(
-            self.cifar100_train, 
+            self.cifar100_train,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=True,
@@ -116,7 +102,7 @@ class Cifar100DataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         return DataLoader(
-            self.cifar100_val, 
+            self.cifar100_val,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=False
@@ -124,7 +110,7 @@ class Cifar100DataModule(pl.LightningDataModule):
 
     def test_dataloader(self):
         return DataLoader(
-            self.cifar100_test, 
+            self.cifar100_test,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=False
@@ -132,15 +118,11 @@ class Cifar100DataModule(pl.LightningDataModule):
 
     def predict_dataloader(self):
         return DataLoader(
-            self.cifar100_predict, 
+            self.cifar100_predict,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=False
         )
-
-    def teardown(self, stage: str):
-        # Used to clean-up when the run is finished
-        ...
 
     def show_samples(self, num_samples: int = 5):
         dataset = self.cifar100_full
@@ -152,10 +134,3 @@ class Cifar100DataModule(pl.LightningDataModule):
             axes[i].set_title(f'Label: {label}')
             axes[i].axis('off')
         plt.show()
-
-if __name__ == "__main__":
-    cifar100 = Cifar100DataModule()
-    
-    cifar100.setup("fit")
-
-    cifar100.show_samples(3)

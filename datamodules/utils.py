@@ -1,7 +1,5 @@
 from omegaconf import OmegaConf
-import sklearn.model_selection
 import torch
-import os
 
 
 def get_data_module(cfg: OmegaConf):
@@ -16,6 +14,7 @@ def get_data_module(cfg: OmegaConf):
         "speech_mfcc",
         "speech_raw",
         "pathfinder",
+        "s_pathfinder",
         "listops",
         "image",
         "s_image",
@@ -35,7 +34,6 @@ def get_data_module(cfg: OmegaConf):
         and cfg.data.reduced_dataset
     ), f"Reduced dataset not supported for {cfg.data.dataset}"
 
-    # can be either sequential or permuted mnist
     if "mnist" in cfg.data.dataset:
         from .mnist import MnistDataModule
 
