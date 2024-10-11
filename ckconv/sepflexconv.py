@@ -74,7 +74,6 @@ class SepFlexConv(nn.Module):
         # init relative positions of the kernel
         self.kernel_positions = torch.zeros(1)
         # init the intervals num between kernels positions
-        self.positions_intervals_num = 32
         self.linspace_stepsize = torch.zeros(1)
 
         if net_cfg.bias:
