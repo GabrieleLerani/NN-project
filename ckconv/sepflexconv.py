@@ -1,13 +1,8 @@
 import torch
 from torch import nn
 from ckconv.ck import MAGNet, create_coordinates, LinearLayer
-# from ck import MAGNet, create_coordinates, LinearLayer
-# from conv import fftconv, conv
 from ckconv.conv import fftconv, conv
-
 from omegaconf import OmegaConf
-import matplotlib.pyplot as plt
-import numpy as np
 
 class SepFlexConv(nn.Module):
     """
@@ -55,39 +50,39 @@ class SepFlexConv(nn.Module):
             kernel_size (int, optional): The size of the kernel. Defaults to 33.
             conv_type (str, optional): The type of convolution. Defaults to "conv".
             fft_thresold (int, optional): The threshold for using FFT. Defaults to 50.
-            bias (bool, optional): Whether to include bias in the pointwise convolution layer. Defaults to False.
+            bias (bool, optional): Whether to include bias in the pointwise convolution layer. Defaults to True.
         """
         super().__init__()
 
-        # sep flex conv parameters
+        # Sep flex conv parameters
         self.data_dim = data_dim
         self.in_channels = in_channels
         hidden_channels = net_cfg.hidden_channels
 
-        # kernel parameters
+        # Kernel parameters
         kernel_no_layers = kernel_cfg.kernel_no_layers
         kernel_hidden_channels = kernel_cfg.kernel_hidden_channels
         self.kernel_size = kernel_cfg.kernel_size
         self.conv_type = kernel_cfg.conv_type
         self.fft_threshold = kernel_cfg.fft_threshold
 
-        # init relative positions of the kernel
+        # Init relative positions of the kernel
         self.kernel_positions = torch.zeros(1)
-        # init the intervals num between kernels positions
+        # Init the intervals num between kernels positions
         self.positions_intervals_num = 32
         self.linspace_stepsize = torch.zeros(1)
 
         if net_cfg.bias:
-            # init random bias with in_channels dimensions
+            # Init random bias with in_channels dimensions
             self.bias = torch.randn(in_channels)
             self.bias.data.fill_(0.0)
         else:
             self.bias = None
 
-        # causal
+        # Causal
         self.causal = net_cfg.causal
 
-        # init gaussian mask parameter, 
+        # Init gaussian mask parameter
         if self.causal:
             mask_mean_param = torch.ones(data_dim)
         else:
@@ -95,11 +90,11 @@ class SepFlexConv(nn.Module):
 
         mask_width_param = torch.Tensor([0.075] * data_dim)
 
-        # do not register mask mean
+        # Do not register mask mean
         self.register_buffer("mask_mean_param", mask_mean_param)
         self.mask_width_param = torch.nn.Parameter(mask_width_param)
 
-        # Define the kernel net, in our case always a MAGNet
+        # Define the kernel net
         self.KernelNet = MAGNet(
             data_dim=data_dim,
             hidden_channels=kernel_hidden_channels,
@@ -117,7 +112,7 @@ class SepFlexConv(nn.Module):
             bias=net_cfg.bias,
         )
 
-        # initialize with kaimi
+        # Initialize with kaimi
         torch.nn.init.kaiming_normal_(self.pointwise_conv.layer.weight)
         if self.pointwise_conv.layer.bias is not None:
             torch.nn.init._no_grad_fill_(self.pointwise_conv.layer.bias, 0.0)
@@ -162,22 +157,22 @@ class SepFlexConv(nn.Module):
         self.log_kernel = conv_kernel
 
         return conv_kernel * mask
-    
+
     def get_rel_positions(self, x):
         """
         Handles the vector or relative positions which is given to KernelNet.
         This method is responsible for creating and managing the kernel positions used in the convolution process.
         It checks if the kernel positions need to be initialized or updated based on the input signal length.
-        
+
         Args:
             x (torch.Tensor): The input tensor to the SepFlexConv layer.
-            
+
         Returns:
             torch.Tensor: The tensor of relative positions to be used in the KernelNet.
         """
         if (
             self.kernel_positions.shape[-1] == 1  # Only for the first time
-        ):  # The conv. receives input signals of length > 1
+        ):
 
             if self.kernel_size == -1:
                 self.kernel_size = x.shape[-1]
@@ -187,6 +182,7 @@ class SepFlexConv(nn.Module):
                 kernel_size=self.kernel_size,
                 data_dim=self.data_dim,
             )
+
             # -> Grid sized: [kernel_size] * data_dim
             # -> kernel_positions : [1, dim, kernel_size, kernel_size]
 
@@ -216,7 +212,7 @@ class SepFlexConv(nn.Module):
             Then you sum over the first dimension and the output will be [1, 1, 33, 33]
         """
 
-        # reshape the mask_mean and mask_sigma so that they can be broadcasted
+        # Reshape the mask_mean and mask_sigma so that they can be broadcasted
         mask_mean = mask_mean.view(1, -1, *(1,) * self.data_dim)
         mask_sigma = mask_sigma.view(1, -1, *(1,) * self.data_dim)
 
@@ -241,7 +237,7 @@ class SepFlexConv(nn.Module):
 
         self.masked_kernel = self.construct_masked_kernel(x)
 
-        size = torch.tensor(self.masked_kernel.shape[2:])  # -> [33,33] for data_dim=2
+        size = torch.tensor(self.masked_kernel.shape[2:])
         # fftconv is used when the size of the kernel is large enough
         if self.conv_type == "fftconv" and torch.all(size > self.fft_threshold):
             out = fftconv(x=x, kernel=self.masked_kernel, bias=self.bias)
@@ -250,57 +246,7 @@ class SepFlexConv(nn.Module):
                 x=x, kernel=self.masked_kernel, bias=self.bias, causal=self.causal
             )
 
-        # pointwise convolution where out is the spatial convolution
+        # Pointwise convolution
         out = self.pointwise_conv(out)
 
         return out
-
-
-# if __name__ == '__main__':
-#     net_cfg = OmegaConf.create({
-#         'hidden_channels': 140,
-#         'bias': False,
-#         'causal': False
-#     })
-    
-#     kernel_cfg = OmegaConf.create({
-#         'kernel_no_layers': 3,
-#         'kernel_hidden_channels': 64,
-#         'kernel_size': 33,
-#         'conv_type': 'conv',
-#         'fft_threshold': 50,
-#         'omega_0': 20
-#     })
-
-#     # Initialize the SepFlexConv model
-#     model = SepFlexConv(
-#         data_dim=2,
-#         in_channels=3,
-#         net_cfg=net_cfg,
-#         kernel_cfg=kernel_cfg
-#     )
-
-#     # Create a random input tensor
-#     x = torch.randn(64, 3, 32, 32)  # Example input shape
-    
-    
-#     # plot the 2D mask for different width
-#     mask_mean_param = torch.zeros(2)
-#     fig, axs = plt.subplots(1, 5, figsize=(20, 4))
-#     for i, value in enumerate(np.linspace(0.075, 0.5, 5)): 
-#         mask_width_param = torch.Tensor([value] * 2)
-
-#         pos = model.get_rel_positions(x)
-#         mask = model.gaussian_mask(
-#             kernel_pos=pos, 
-#             mask_mean=mask_mean_param, 
-#             mask_sigma=mask_width_param
-#         ).squeeze(0).squeeze(0)
-
-#         ax = axs[i]
-#         im = ax.imshow(mask, cmap='hot', interpolation='nearest')
-#         ax.set_title(f"Mask for value={value}")
-#     plt.colorbar(im, ax=axs.ravel().tolist())
-#     plt.show()
-
-    

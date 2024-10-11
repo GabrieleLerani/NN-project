@@ -14,12 +14,12 @@ class Cifar10DataModule(pl.LightningDataModule):
         self.data_dir = data_dir
         self.type = cfg.data.dataset
         self.cfg = cfg
-        self.num_workers = 0 # for google colab training
+        self.num_workers = 0
         self._yaml_parameters()
         self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(42)
 
     def prepare_data(self):
-        # download
+        # Download
         CIFAR10(self.data_dir, train=True, download=True)
         CIFAR10(self.data_dir, train=False, download=True)
 
@@ -35,7 +35,8 @@ class Cifar10DataModule(pl.LightningDataModule):
         ])
 
         if self.type == "s_cifar10":
-            self.transform.transforms.append(transforms.Lambda(lambda x: x.view(3, -1))) # flatten the image to 1024 pixels, preserve 3 channels
+            # Flatten the image to 1024 pixels, preserve 3 channels
+            self.transform.transforms.append(transforms.Lambda(lambda x: x.view(3, -1)))
 
 
     def _yaml_parameters(self):
@@ -71,7 +72,6 @@ class Cifar10DataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "kernel.omega_0", 1435.77)
                 OmegaConf.update(self.cfg, "net.data_dim", 2)
                 OmegaConf.update(self.cfg, "kernel.kernel_size", 31)
-
             elif self.type == "s_cifar10":
                 OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.25)
@@ -92,7 +92,7 @@ class Cifar10DataModule(pl.LightningDataModule):
         # Assign test dataset for use in dataloader(s)
         if stage == "test":
             self.cifar10_test = CIFAR10(self.data_dir, train=False, transform=self.transform)
-            #print(f'Test set size: {len(self.cifar10_test)}')
+            print(f'Test set size: {len(self.cifar10_test)}')
 
         if stage == "predict":
             self.cifar10_predict = CIFAR10(self.data_dir, train=False)
@@ -110,27 +110,11 @@ class Cifar10DataModule(pl.LightningDataModule):
             generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
         )
 
-        if self.cfg.data.reduced_dataset:
-            REDUCED_TRAIN_SIZE = 500
-            REDUCED_VAL_SIZE = 100
-
-            train, _ = random_split(
-                train_full,
-                [REDUCED_TRAIN_SIZE, FULL_TRAIN_SIZE - REDUCED_TRAIN_SIZE],
-                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
-            )
-            val, _ = random_split(
-                val_full,
-                [REDUCED_VAL_SIZE, FULL_VAL_SIZE - REDUCED_VAL_SIZE],
-                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
-            )
-        else:
-            train, val = train_full, val_full
+        train, val = train_full, val_full
 
         print(f"Training set size: {len(train)}")
         print(f"Validation set size: {len(val)}")
         return train, val
-
 
     def train_dataloader(self):
         return DataLoader(
@@ -162,11 +146,6 @@ class Cifar10DataModule(pl.LightningDataModule):
                           num_workers=self.num_workers,
                           shuffle=False)
 
-    def teardown(self, stage: str):
-        # Used to clean-up when the run is finished
-        ...
-
-
     def show_samples(self, num_samples: int = 5):
         dataset = self.cifar10_full
         fig, axes = plt.subplots(1, num_samples, figsize=(15, 3))
@@ -177,10 +156,3 @@ class Cifar10DataModule(pl.LightningDataModule):
             axes[i].set_title(f'Label: {label}')
             axes[i].axis('off')
         plt.show()
-
-if __name__ == "__main__":
-    cifar10 = Cifar10DataModule("data/datasets",32)
-    
-    cifar10.setup("fit")
-    cifar10.show_samples(2)
-    

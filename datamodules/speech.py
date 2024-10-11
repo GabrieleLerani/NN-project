@@ -1,13 +1,12 @@
-import pytorch_lightning as L
+import pytorch_lightning as pl
 import torchaudio
 from torchaudio.datasets import SPEECHCOMMANDS
 from torch.utils.data import DataLoader, TensorDataset
 import torch
 import os
-from tqdm import tqdm
 from torch.utils.data import random_split
 from omegaconf import OmegaConf
-from datasets import load_dataset, DatasetDict, Dataset
+from datasets import DatasetDict, Dataset
 from datamodules.utils import feature_normalisation
 from torch.utils.data import Dataset
 
@@ -26,7 +25,7 @@ class TensorDataset(Dataset):
         return self.X[idx], self.Y[idx]
 
 
-class SpeechCommandsDataModule(L.LightningDataModule):
+class SpeechCommandsDataModule(pl.LightningDataModule):
 
     def __init__(
         self,
@@ -36,9 +35,8 @@ class SpeechCommandsDataModule(L.LightningDataModule):
 
         super().__init__()
 
-        # Save parameters to self
-        self.data_dir = Path(data_dir) / "SPEECH"
-        self.num_workers = 7
+        self.data_dir = Path(data_dir)
+        self.num_workers = 1
         self.serialized_dataset_path = os.path.join(
             self.data_dir, "preprocessed_dataset_speech.pth"
         )
@@ -47,7 +45,6 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         self.train_split = 0.7
         self.test_split = 0.15
 
-        # Determine data_type
         self.type = cfg.data.dataset
         self.speech_dir = os.path.join(
             self.data_dir, "SpeechCommands/speech_commands_v0.02"
@@ -67,16 +64,16 @@ class SpeechCommandsDataModule(L.LightningDataModule):
 
         assert self.type in ["speech_raw", "speech_mfcc"]
         self.cfg = cfg
-        self.generator = torch.Generator(self.cfg.train.accelerator).manual_seed(42)
 
         self._yaml_parameters()
-        self._set_transform()
+
 
     def _set_transform(self):
         # 16 QAM modulation
         self.transform = torchaudio.transforms.Vol(
             gain=1.0 / 32768, gain_type="amplitude"
         )
+
 
     def _yaml_parameters(self):
         OmegaConf.update(self.cfg, "net.out_channels", 10)
@@ -92,11 +89,13 @@ class SpeechCommandsDataModule(L.LightningDataModule):
             OmegaConf.update(self.cfg, "train.batch_size", 20)
             OmegaConf.update(self.cfg, "train.epochs", 160)
             OmegaConf.update(self.cfg, "kernel.omega_0", 1295.61)
+
         elif self.type == "speech_mfcc":
             OmegaConf.update(self.cfg, "net.in_channels", 20)
             OmegaConf.update(self.cfg, "train.batch_size", 100)
             OmegaConf.update(self.cfg, "train.epochs", 110)
             OmegaConf.update(self.cfg, "kernel.omega_0", 750.18)
+
 
     def _loading_pipeline(self):
         """
@@ -109,10 +108,9 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         class_num = 0
         for foldername in self.selected_dirs:
             loc = os.path.join(self.speech_dir, foldername)
-            print(loc)
             for filename in os.listdir(loc):
                 audio, _ = torchaudio.load(
-                    os.path.join(loc, filename), channels_first=False,format="wav"
+                    os.path.join(loc, filename), channels_first=False
                 )
 
                 if audio.size(0) != 16000:
@@ -120,8 +118,6 @@ class SpeechCommandsDataModule(L.LightningDataModule):
 
                 # Apply transformation
                 audio = self.transform(audio)
-
-                # print(audio.shape)
 
                 X_list.append(audio)
                 Y_list.append(torch.tensor(class_num, dtype=torch.long))
@@ -149,23 +145,20 @@ class SpeechCommandsDataModule(L.LightningDataModule):
 
             X = X.unsqueeze(1).squeeze(-1)
 
-        # dataset creation
-
+        # Dataset creation
         tensor_dataset = TensorDataset(X, Y)
 
-        # set dataset splits lentgths
+        # Set dataset splits lengths
         len_dataset = X.size(0)
         val_len = int(self.val_split * len_dataset)
         test_len = int(self.test_split * len_dataset)
         train_len = len_dataset - val_len - test_len
 
         self.train_dataset, self.val_dataset, self.test_dataset = random_split(
-            tensor_dataset,
-            [train_len, val_len, test_len],
-            generator=self.generator,
+            tensor_dataset, [train_len, val_len, test_len]
         )
 
-        # cropping train_X for normalization
+        # Cropping train_X for normalization
         train_X = [x for x, _ in self.train_dataset]
         train_X = torch.stack(train_X, dim=0)
         train_Y = [y for _, y in self.train_dataset]
@@ -192,35 +185,41 @@ class SpeechCommandsDataModule(L.LightningDataModule):
         # Save to disk
         torch.save(self.dataset, self.serialized_dataset_path)
 
+
     def prepare_data(self):
         if not self.data_dir.is_dir():
             print(f"Creating directory at {self.data_dir}")
             os.makedirs(self.data_dir, exist_ok=True)
             print(f"Directory created: {os.path.isdir(self.data_dir)}")
 
-            try:
-                self.data = SPEECHCOMMANDS(self.data_dir, download=True)
-            except Exception as e:
-                print(f"Error initializing SPEECHCOMMANDS: {e}")
+        SPEECHCOMMANDS(self.data_dir, download=True)
+
 
     def setup(self, stage: str):
+        self._set_transform()
+
         self.batch_size = self.cfg.train.batch_size
 
-        # if already done load the preprocessed dataset
+        # If already done, load the preprocessed dataset
         if os.path.exists(self.serialized_dataset_path):
             print(f"Loading dataset from {self.serialized_dataset_path}...")
             self.dataset = torch.load(self.serialized_dataset_path)
         else:
-            # pipeline to load data
+            # Pipeline to load data
             self._loading_pipeline()
 
-        # assign train/val datasets for use in dataloaders
+        # Assign train/val datasets for use in dataloaders
         if stage == "fit":
 
-            self.train_dataset = self.dataset["train"]
-            self.val_dataset = self.dataset["val"]
+            self.train_dataset, self.val_dataset = (
+                self.dataset["train"],
+                self.dataset["val"],
+            )
 
         if stage == "test":
+            self.test_dataset = self.dataset["test"]
+
+        if stage == "predict":
             self.test_dataset = self.dataset["test"]
 
     def train_dataloader(self):
@@ -228,8 +227,7 @@ class SpeechCommandsDataModule(L.LightningDataModule):
             self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            shuffle=True,
-            generator=self.generator
+            shuffle=False,
         )
 
     def val_dataloader(self):
@@ -249,18 +247,10 @@ class SpeechCommandsDataModule(L.LightningDataModule):
             shuffle=False,
         )
 
-
-if __name__ == "__main__":
-
-    cfg = OmegaConf.load("config/config.yaml")
-
-    dm = SpeechCommandsDataModule(
-        cfg=cfg,
-    )
-    dm.prepare_data()
-    dm.setup(stage="fit")
-    train_loader = dm.train_dataloader()
-
-    for x, y in train_loader:
-        print(f"Batch of images shape: {x.shape} {y.shape}")
-        break
+    def predict_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+        )

@@ -9,20 +9,18 @@ from typing import Tuple
 import numpy as np
 
 
-
-    
 class MnistDataModule(pl.LightningDataModule):
     def __init__(self, cfg:OmegaConf, data_dir: str = "datasets"):
         super().__init__()
         self.data_dir = data_dir
         self.type = cfg.data.dataset
         self.cfg = cfg
-        self.num_workers = 7  # for google colab training
+        self.num_workers = 0
         self._yaml_parameters()
         self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(42)
 
     def prepare_data(self):
-        # download
+        # Download
         MNIST(self.data_dir, train=True, download=True)
         MNIST(self.data_dir, train=False, download=True)
 
@@ -38,24 +36,25 @@ class MnistDataModule(pl.LightningDataModule):
             [
                 transforms.ToTensor(),
                 transforms.Normalize(mean=(0.1307,), std=(0.3081,)),
+                # Flatten the image to 784 pixels
                 transforms.Lambda(
                     lambda x: x.view(1, -1)
-                ),  # flatten the image to 784 pixels
+                ),
             ]
         )
 
         if self.type == "p_mnist":
             self.permutation = self._generate_permutation()  # Generate a fixed permutation
-            #print(self.permutation)
+            print(self.permutation)
             self.transform.transforms.append(transforms.Lambda(
-                        lambda x: x[:,self.permutation]  # fixed permutation
+                        lambda x: x[:,self.permutation]  # Fixed permutation
                     ))
 
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
 
         OmegaConf.update(self.cfg, "train.batch_size", 100)
-        OmegaConf.update(self.cfg, "train.epochs", 72)
+        OmegaConf.update(self.cfg, "train.epochs", 136)
         OmegaConf.update(self.cfg, "net.in_channels", 1)
         OmegaConf.update(self.cfg, "net.out_channels", 10)
         OmegaConf.update(self.cfg, "net.data_dim", 1)
@@ -84,24 +83,24 @@ class MnistDataModule(pl.LightningDataModule):
                 OmegaConf.update(self.cfg, "train.dropout_rate", 0.2)
                 OmegaConf.update(self.cfg, "kernel.omega_0", 2985.63)
 
-    def setup(self, stage = None):
+    def setup(self, stage: str):
         self._set_transform()
 
         self.batch_size = self.cfg.train.batch_size
 
         # Assign train/val datasets for use in dataloaders
-        if stage == "fit" or stage is None:
+        if stage == "fit":
 
             self.mnist_train, self.mnist_val = self._get_train_dataset()
 
         # Assign test dataset for use in dataloader(s)
-        if stage == "test" or stage is None:
+        if stage == "test":
             self.mnist_test = MNIST(
                 self.data_dir, train=False, transform=self.transform
             )
             print(f"Test set size: {len(self.mnist_test)}")
 
-        if stage == "predict" or stage is None:
+        if stage == "predict":
             self.mnist_predict = MNIST(
                 self.data_dir, train=False, transform=self.transform
             )
@@ -118,23 +117,8 @@ class MnistDataModule(pl.LightningDataModule):
             [FULL_TRAIN_SIZE, FULL_VAL_SIZE],
             generator=self.generator,
         )
-
-        if self.cfg.data.reduced_dataset:
-            REDUCED_TRAIN_SIZE = 1000
-            REDUCED_VAL_SIZE = 200
-
-            mnist_train, _ = random_split(
-                mnist_train_full,
-                [REDUCED_TRAIN_SIZE, FULL_TRAIN_SIZE - REDUCED_TRAIN_SIZE],
-                generator=self.generator
-            )
-            mnist_val, _ = random_split(
-                mnist_val_full,
-                [REDUCED_VAL_SIZE, FULL_VAL_SIZE - REDUCED_VAL_SIZE],
-                generator=self.generator
-            )
-        else:
-            mnist_train, mnist_val = mnist_train_full, mnist_val_full
+            
+        mnist_train, mnist_val = mnist_train_full, mnist_val_full
 
         print(f"Training set size: {len(mnist_train)}")
         print(f"Validation set size: {len(mnist_val)}")
@@ -174,17 +158,6 @@ class MnistDataModule(pl.LightningDataModule):
             shuffle=False
         )
 
-    # def on_before_batch_transfer(self, batch, dataloader_idx: int):
-    #     if self.type == "p_mnist":
-    #         # apply permutation
-    #         x, y = batch
-    #         if x.device != self.permutation.device: # Check if devices match
-    #             self.permutation = self.permutation.to(x.device) # Move permutation to the same device as x
-    #         x = x[:, :, self.permutation]
-    #         batch = x, y
-    #     return batch
-
-
     def show_samples(self, num_samples: int = 5):
         dataset = self.mnist_full
         for i in range(num_samples):
@@ -195,6 +168,5 @@ class MnistDataModule(pl.LightningDataModule):
 
             # Add title and labels
             plt.title(f"Flattened Image of Label: {label}")
-
 
         plt.show()

@@ -13,7 +13,8 @@ class STL10DataModule(pl.LightningDataModule):
         super().__init__()
         self.data_dir = data_dir
         self.cfg = cfg
-        self.num_workers = 0 # for google colab training
+        self.num_workers = 0
+        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(42)
         self.transform = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Normalize(
@@ -23,12 +24,12 @@ class STL10DataModule(pl.LightningDataModule):
         ])
         self._yaml_parameters()
 
+
     def prepare_data(self):
-        # download
+        # Download
         STL10(self.data_dir, split="train", download=True)
         STL10(self.data_dir, split="test", download=True)
 
-        
 
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
@@ -42,16 +43,15 @@ class STL10DataModule(pl.LightningDataModule):
         OmegaConf.update(self.cfg, "train.dropout_rate", 0.1)
 
         if hidden_channels == 140:
-            OmegaConf.update(self.cfg, "train.learning_rate", 0.02)            
+            OmegaConf.update(self.cfg, "train.learning_rate", 0.02)
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
             OmegaConf.update(self.cfg, "kernel.kernel_size", 33)
-            
-            
+
         elif hidden_channels == 380:
-            OmegaConf.update(self.cfg, "train.learning_rate", 0.01)            
+            OmegaConf.update(self.cfg, "train.learning_rate", 0.01)
             OmegaConf.update(self.cfg, "train.weight_decay", 1e-6)
             OmegaConf.update(self.cfg, "kernel.kernel_size", 31)
-            
+
 
     def setup(self, stage: str):
         self.batch_size = self.cfg.train.batch_size
@@ -59,7 +59,6 @@ class STL10DataModule(pl.LightningDataModule):
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
             self.stl10_train, self.stl10_val = self._get_train_dataset()
-
 
         # Assign test dataset for use in dataloader(s)
         if stage == "test":
@@ -70,46 +69,34 @@ class STL10DataModule(pl.LightningDataModule):
             self.stl10_predict = STL10(self.data_dir, split="test", transform=self.transform)
             print(f'Prediction set size: {len(self.stl10_predict)}')
 
+
     def _get_train_dataset(self) -> Tuple[Dataset, Dataset]:
 
         FULL_TRAIN_SIZE = 4500
         FULL_VAL_SIZE = 500
-        
-        self.stl10_full = STL10(self.data_dir, train=True, transform=self.transform)
+
+        self.stl10_full = STL10(self.data_dir, split="train", transform=self.transform)
 
         # Split the full dataset into train and validation sets
         train_full, val_full = random_split(
             self.stl10_full,
             [FULL_TRAIN_SIZE, FULL_VAL_SIZE],
-            generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
+            generator=self.generator,
         )
 
-        if self.cfg.data.reduced_dataset:
-            REDUCED_TRAIN_SIZE = 500
-            REDUCED_VAL_SIZE = 100
-            train, _ = random_split(
-                train_full,
-                [REDUCED_TRAIN_SIZE, FULL_TRAIN_SIZE - REDUCED_TRAIN_SIZE],
-                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
-            )
-            val, _ = random_split(
-                val_full,
-                [REDUCED_VAL_SIZE, FULL_VAL_SIZE - REDUCED_VAL_SIZE],
-                generator=torch.Generator(self.cfg.train.accelerator).manual_seed(42),
-            )
-        else:
-            train, val = train_full, val_full
+        train, val = train_full, val_full
 
         print(f"Training set size: {len(train)}")
         print(f"Validation set size: {len(val)}")
         return train, val
-        
+
 
     def train_dataloader(self):
         return DataLoader(self.stl10_train,
                           batch_size=self.batch_size,
                           num_workers=self.num_workers,
-                          shuffle=False)
+                          shuffle=True,
+                          generator=self.generator)
 
     def val_dataloader(self):
         return DataLoader(self.stl10_val,
@@ -129,10 +116,6 @@ class STL10DataModule(pl.LightningDataModule):
                           num_workers=self.num_workers,
                           shuffle=False)
 
-    def teardown(self, stage: str):
-        # Used to clean-up when the run is finished
-        ...
-
     def show_samples(self, num_samples: int = 5):
         dataset = STL10(self.data_dir, split="train", transform=self.transform)
         fig, axes = plt.subplots(1, num_samples, figsize=(15, 3))
@@ -143,14 +126,3 @@ class STL10DataModule(pl.LightningDataModule):
             axes[i].set_title(f'Label: {label}')
             axes[i].axis('off')
         plt.show()
-
-if __name__ == "__main__":
-    dm = STL10DataModule()
-    
-    dm.setup("fit")
-
-    dm.setup("test")
-    
-    dm.setup("predict")
-    
-    dm.show_samples(num_samples=2)

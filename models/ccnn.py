@@ -10,11 +10,10 @@ import matplotlib.pyplot as plt
 
 from sklearn.metrics import confusion_matrix
 from models.modules import S4Block
-from models.modules import TCNBlock
 from ckconv import SepFlexConv
 from ckconv.ck import LinearLayer
 from models.modules.utils import GetBatchNormalization
-from models.modules.utils import GetAdaptiveAvgPool, GetDropout
+from models.modules.utils import GetAdaptiveAvgPool
 from omegaconf import OmegaConf
 
 
@@ -22,7 +21,7 @@ class CCNN(pl.LightningModule):
     """
     CCNN architecture (Romero et al., 2022) as defined in the original paper.
 
-    input --> SepFlexConv --> BatchNorm --> GELU --> L x S4Block --> BatchNorm --> GlobalAvgPool -->PointwiseLinear --> output
+    input --> SepFlexConv --> BatchNorm --> GELU --> L x S4Block --> BatchNorm --> GlobalAvgPool --> PointwiseLinear --> output
     """
     def __init__(
         self,
@@ -33,12 +32,10 @@ class CCNN(pl.LightningModule):
     ):
         super(CCNN, self).__init__()
 
-
         self.no_blocks = cfg.net.no_blocks
         hidden_channels = cfg.net.hidden_channels
 
         self.learning_rate = cfg.train.learning_rate
-        self.mask_lr_ratio = cfg.train.mask_lr_ratio
         self.warmup_epochs = cfg.train.warmup_epochs
         self.epochs = cfg.train.epochs
         self.start_factor = cfg.train.start_factor
@@ -49,50 +46,39 @@ class CCNN(pl.LightningModule):
         self.val_preds = []
         self.val_labels = []
 
-        # separable flexible convolutional layer
+        # Separable flexible convolutional layer
         self.sep_flex_conv_layer = SepFlexConv(
             data_dim=data_dim,
             in_channels=in_channels,
             net_cfg=cfg.net,
             kernel_cfg=cfg.kernel
         )
-        # batch normalization layer
+        # Batch normalization layer
         self.batch_norm_layer = [
             GetBatchNormalization(data_dim=data_dim, num_features=hidden_channels),
             GetBatchNormalization(data_dim=data_dim, num_features=hidden_channels)
         ]
-        # gelu layer
+        # Gelu layer
         self.gelu_layer = nn.GELU()
 
-        # blocks can be either S4 or TCN
         self.blocks = []
         for _ in range(self.no_blocks):
-            if cfg.net.block_type == "s4":
-                s4 = S4Block(
-                    in_channels=hidden_channels,
-                    out_channels=hidden_channels,
-                    data_dim=data_dim,
-                    net_cfg=cfg.net,
-                    kernel_cfg=cfg.kernel,
-                    dropout=cfg.train.dropout_rate
-                )
-                self.blocks.append(s4)
-            elif cfg.net.block_type == "tcn":
-                tcn = TCNBlock(
-                    in_channels=hidden_channels,
-                    out_channels=hidden_channels,
-                    data_dim=data_dim, net_cfg=cfg.net,
-                    kernel_cfg=cfg.kernel,
-                    dropout=cfg.train.dropout_rate
-                )
-                self.blocks.append(tcn)
+            s4 = S4Block(
+                in_channels=hidden_channels,
+                out_channels=hidden_channels,
+                data_dim=data_dim,
+                net_cfg=cfg.net,
+                kernel_cfg=cfg.kernel,
+                dropout=cfg.train.dropout_rate
+            )
+            self.blocks.append(s4)
 
-        # global average pooling layer (the information of each channel is compressed into a single value)
+        # Global average pooling layer (the information of each channel is compressed into a single value)
         self.global_avg_pool_layer = GetAdaptiveAvgPool(data_dim=data_dim, output_size=(1,) * data_dim)
-        # pointwise linear convolutional layer
+        # Pointwise linear convolutional layer
         self.pointwise_linear_layer = LinearLayer(data_dim, hidden_channels, out_channels)
 
-        # define sequencial modules
+        # Define sequencial modules
         self.seq_modules = nn.Sequential(
             self.sep_flex_conv_layer,
             self.batch_norm_layer[0],
@@ -103,11 +89,11 @@ class CCNN(pl.LightningModule):
             self.pointwise_linear_layer
         )
 
-        # init last layer
+        # Init last layer
         torch.nn.init.kaiming_normal_(self.pointwise_linear_layer.layer.weight)
         self.pointwise_linear_layer.layer.bias.data.fill_(value=0.0)
 
-        # define metrics
+        # Define metrics
         self.train_accuracy = torchmetrics.classification.Accuracy(
             task="multiclass", num_classes=out_channels
         )
@@ -212,11 +198,8 @@ class CCNN(pl.LightningModule):
 
     def configure_optimizers(self):
         # Define the optimizer (AdamW)
-
-        parameters = self._get_params()
-
         optimizer = optim.AdamW(
-            params=parameters,
+            params=self.parameters(),
             lr=self.learning_rate,
             weight_decay=self.weight_decay
         )
@@ -239,40 +222,10 @@ class CCNN(pl.LightningModule):
         # Combine the warm-up and cosine annealing using ChainedScheduler
         # ChainedScheduler applies both the schedulers at the same time
         # SequentialLR applies one scheduler at a time
-        #scheduler = optim.lr_scheduler.ChainedScheduler(optimizer=optimizer, schedulers=[linear_warmup, cosine_scheduler])
         scheduler = optim.lr_scheduler.SequentialLR(optimizer=optimizer, schedulers=[linear_warmup, cosine_scheduler], milestones=[self.warmup_epochs])
 
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
-    def _get_params(self):
-            
-        
-        mask_lr = self.learning_rate * self.mask_lr_ratio
-
-        # Divide params in mask parameters & other parameters
-        all_parameters = set(self.parameters())
-        # mask_params
-        mask_params = []
-        for m in self.modules():
-            if isinstance(m, SepFlexConv):
-                mask_params += list(
-                    map(
-                        lambda x: x[1],
-                        list(
-                            filter(lambda kv: "mask_params" in kv[0], m.named_parameters())
-                        ),
-                    )
-                )
-        mask_params = set(mask_params)
-        other_params = all_parameters - mask_params
-        # as list
-        mask_params = list(mask_params)
-        other_params = list(other_params)
-        parameters = [
-            {"params": other_params},
-            {"params": mask_params, "lr": mask_lr},
-        ]
-        return parameters
 
     def get_kernel(self):
         sep_flex_conv_layer = self.seq_modules[0]

@@ -1,6 +1,5 @@
 from torch import nn
 from .linear import LinearLayer
-from .create_coordinates import create_coordinates
 from .anisotropic_gabor_Layer import AnisotropicGaborLayer
 import torch
 import math
@@ -22,7 +21,7 @@ class MFN(nn.Module):
         """
         super(MFN, self).__init__()
 
-        # hidden layers
+        # Hidden layers
         self.linearLayer = nn.ModuleList(
             [
                 LinearLayer(
@@ -35,7 +34,7 @@ class MFN(nn.Module):
             ]
         )
 
-        # output layer
+        # Output layer
         self.linearLayer.append(
             LinearLayer(
                 dim=data_dim,
@@ -57,7 +56,6 @@ class MFN(nn.Module):
         """
 
         if not self.reweighted_output_layer:
-
             # Re weight the last layer of the kernel net
 
             kernel_size = torch.Tensor([*kernel_positions.shape[data_dim:]]).prod().item() # just a way to get the kernel size
@@ -65,18 +63,17 @@ class MFN(nn.Module):
             # prod multiplies all elements in the tensor i.e. 33*33 = 1089
             # item converts the tensor to a python number
 
-            # define gain / sqrt(in_channels * kernel_size) by Chang et al. (2020)
+            # Define gain / sqrt(in_channels * kernel_size) by Chang et al. (2020)
             factor = 1.0 / math.sqrt(in_channels * kernel_size)
 
-            # get the last layer and re-weight it
+            # Get the last layer and re-weight it
             self.linearLayer[-1].layer.weight.data *= factor
 
-            # set the flag to True so that the output layer is only re-weighted the first time
+            # Set the flag to True so that the output layer is only re-weighted the first time
             self.reweighted_output_layer = True
 
 
     def forward(self, x):
-
         h = self.gabor_filters[0](x)
         for l in range(1, len(self.gabor_filters)):
             h = self.gabor_filters[l](x) * self.linearLayer[l - 1](h)
@@ -118,19 +115,3 @@ class MAGNet(MFN):
                 for l in range(no_layers + 1)
             ]
         )
-
-
-# if __name__ == "__main__":
-#     # test the model
-#     data_dim = 2
-#     model = MAGNet(data_dim=data_dim, hidden_channels=140, out_channels=2, no_layers=3)
-
-#     x = create_coordinates(
-#         3, data_dim
-#     )
-#     print(f"grid shape: {x.shape}")
-#     print(x)
-#     x = model(x)
-#     print(f"results : {x}")
-#     print(x.shape)
- 
