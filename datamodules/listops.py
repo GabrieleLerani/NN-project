@@ -142,7 +142,9 @@ class ListOpsDataModule(pl.LightningDataModule):
         # Building vocabulary
         vocab_set = set()
 
-        with tqdm(total=len(self.dataset["train"]), desc='Vocabulary construction') as progress_bar:
+        with tqdm(
+            total=len(self.dataset["train"]), desc="Vocabulary construction"
+        ) as progress_bar:
             for i, data in enumerate(self.dataset["train"]):
                 examples = cleanFeatures(data)
                 examples = examples["Source"]
