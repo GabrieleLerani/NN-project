@@ -62,8 +62,9 @@ class TextDataModule(pl.LightningDataModule):
         self.cfg = cfg
 
         self._yaml_parameters()
-        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(42)
-
+        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(
+            42
+        )
 
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
@@ -210,8 +211,10 @@ class TextDataModule(pl.LightningDataModule):
         if stage == "fit":
             self.train_dataset, self.val_dataset = random_split(
                 self.dataset["train"],
-                [int(len(self.dataset["train"]) * (1 - self.val_split)),
-                 int(len(self.dataset["train"]) * self.val_split)],
+                [
+                    int(len(self.dataset["train"]) * (1 - self.val_split)),
+                    int(len(self.dataset["train"]) * self.val_split),
+                ],
                 generator=self.generator,
             )
 
@@ -221,13 +224,9 @@ class TextDataModule(pl.LightningDataModule):
         # Batching
         def collate_fn(batch):
             xs, ys = zip(*[(data["Source"], data["Target"]) for data in batch])
-
-            # Efficiently convert list to tensor in one pass
-            xs = [torch.tensor(x).view(1, self.max_length).unsqueeze(1).float() for x in xs]  # Combine unsqueeze and float conversion
-
-            # Convert ys to tensor in one go
+            xs = torch.stack([torch.tensor(x) for x in xs])
+            xs = xs.unsqueeze(1).float()
             ys = torch.tensor(ys)
-
             return xs, ys
 
         self.collate_fn = collate_fn
