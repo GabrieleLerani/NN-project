@@ -20,19 +20,6 @@ def get_data_module(cfg: OmegaConf):
         "s_image",
         "text",
     ], "Dataset not supported"
-    assert not (
-        cfg.data.dataset
-        in [
-            "speech_mfcc",
-            "speech_raw",
-            "pathfinder",
-            "s_pathfinder",
-            "path_x",
-            "image",
-            "s_image",
-        ]
-        and cfg.data.reduced_dataset
-    ), f"Reduced dataset not supported for {cfg.data.dataset}"
 
     if "mnist" in cfg.data.dataset:
         from .mnist import MnistDataModule

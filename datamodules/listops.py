@@ -28,8 +28,9 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.cfg = cfg
 
         self._yaml_parameters()
-        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(42)
-
+        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(
+            42
+        )
 
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
@@ -51,7 +52,6 @@ class ListOpsDataModule(pl.LightningDataModule):
             OmegaConf.update(self.cfg, "train.weight_decay", 0)
             OmegaConf.update(self.cfg, "train.dropout_rate", 0.25)
 
-
     def _download_lra_release(self):
         url = "https://storage.googleapis.com/long-range-arena/lra_release.gz"
         local_filename = os.path.join(self.data_dir, "lra_release.gz")
@@ -71,40 +71,41 @@ class ListOpsDataModule(pl.LightningDataModule):
                     size = f.write(chunk)
                     bar.update(size)
 
-
     def _extract_lra_release(self):
         local_filename = os.path.join(self.data_dir, "lra_release.gz")
 
         # Extraction the tar.gz file
-        with tarfile.open(local_filename, 'r:gz') as tar:
+        with tarfile.open(local_filename, "r:gz") as tar:
             # Get the total number of files in the tar archive
             total_files = len(tar.getmembers())
 
             # Initialize tqdm progress bar
-            with tqdm(total=total_files, unit='files', desc='Extracting') as progress_bar:
+            with tqdm(
+                total=total_files, unit="files", desc="Extracting"
+            ) as progress_bar:
                 for member in tar.getmembers():
                     # Extract each file
                     tar.extract(member, path=self.data_dir)
                     # Update progress bar
                     progress_bar.update(1)
-
 
     def _extract_light_lra_release(self):
         local_filename = os.path.join(self.data_dir, "light_lra_release.tar.gz")
 
         # Extraction the tar.gz file
-        with tarfile.open(local_filename, 'r:gz') as tar:
+        with tarfile.open(local_filename, "r:gz") as tar:
             # Get the total number of files in the tar archive
             total_files = len(tar.getmembers())
 
             # Initialize tqdm progress bar
-            with tqdm(total=total_files, unit='files', desc='Extracting') as progress_bar:
+            with tqdm(
+                total=total_files, unit="files", desc="Extracting"
+            ) as progress_bar:
                 for member in tar.getmembers():
                     # Extract each file
                     tar.extract(member, path=self.data_dir)
                     # Update progress bar
                     progress_bar.update(1)
-
 
     def _loading_pipeline(self):
         """
@@ -120,7 +121,9 @@ class ListOpsDataModule(pl.LightningDataModule):
         self.dataset = load_dataset(
             "csv",
             data_files={
-                "train": str(self.data_dir / "lra_release/listops-1000/basic_train.tsv"),
+                "train": str(
+                    self.data_dir / "lra_release/listops-1000/basic_train.tsv"
+                ),
                 "val": str(self.data_dir / "lra_release/listops-1000/basic_val.tsv"),
                 "test": str(self.data_dir / "lra_release/listops-1000/basic_test.tsv"),
             },
@@ -171,7 +174,9 @@ class ListOpsDataModule(pl.LightningDataModule):
 
             if len(encoded_tokens) < self.max_length:
                 padding_size = self.max_length - len(encoded_tokens)
-                encoded_tokens = [word_to_number["<pad>"]] * padding_size + encoded_tokens
+                encoded_tokens = [
+                    word_to_number["<pad>"]
+                ] * padding_size + encoded_tokens
             elif len(encoded_tokens) > self.max_length:
                 encoded_tokens = encoded_tokens[: self.max_length]
             return {
@@ -197,14 +202,13 @@ class ListOpsDataModule(pl.LightningDataModule):
         print(f"Saving dataset to {self.serialized_dataset_path}...")
         self.dataset.save_to_disk(self.serialized_dataset_path)
 
-
     def prepare_data(self):
         if not self.cfg.data.light_lra:
             if not self.data_dir.is_dir():
                 # Create data directory if it doesn't exist
                 os.makedirs(self.data_dir, exist_ok=True)
 
-            if not os.path.exists(Path(self.data_dir) / "lra_release.gz"):
+            if not os.path.exists(Path(self.data_dir) / "lra_release"):
                 self._download_lra_release()
             else:
                 print("Zip already downloaded. Skipping download.")
@@ -214,14 +218,15 @@ class ListOpsDataModule(pl.LightningDataModule):
                 print("Zip already extracted. Skipping extracting.")
 
         else:
-            if not self.data_dir.is_dir() or not os.path.exists(Path(self.data_dir) / "light_lra_release.tar.gz"):
+            if not self.data_dir.is_dir() or not os.path.exists(
+                Path(self.data_dir) / "light_lra_release.tar.gz"
+            ):
                 print("There is no light version of LRA provided")
                 return
             if not os.path.exists(Path(self.data_dir) / "lra_release"):
                 self._extract_light_lra_release()
             else:
                 print("Zip already extracted. Skipping extracting.")
-
 
     def setup(self, stage):
         self.batch_size = self.cfg.train.batch_size

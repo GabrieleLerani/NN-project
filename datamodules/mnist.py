@@ -10,20 +10,21 @@ import numpy as np
 
 
 class MnistDataModule(pl.LightningDataModule):
-    def __init__(self, cfg:OmegaConf, data_dir: str = "datasets"):
+    def __init__(self, cfg: OmegaConf, data_dir: str = "datasets"):
         super().__init__()
         self.data_dir = data_dir
         self.type = cfg.data.dataset
         self.cfg = cfg
         self.num_workers = 0
         self._yaml_parameters()
-        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(42)
+        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(
+            42
+        )
 
     def prepare_data(self):
         # Download
         MNIST(self.data_dir, train=True, download=True)
         MNIST(self.data_dir, train=False, download=True)
-
 
     def _generate_permutation(self):
         np.random.seed(42)
@@ -37,24 +38,24 @@ class MnistDataModule(pl.LightningDataModule):
                 transforms.ToTensor(),
                 transforms.Normalize(mean=(0.1307,), std=(0.3081,)),
                 # Flatten the image to 784 pixels
-                transforms.Lambda(
-                    lambda x: x.view(1, -1)
-                ),
+                transforms.Lambda(lambda x: x.view(1, -1)),
             ]
         )
 
         if self.type == "p_mnist":
-            self.permutation = self._generate_permutation()  # Generate a fixed permutation
+            self.permutation = (
+                self._generate_permutation()
+            )  # Generate a fixed permutation
             print(self.permutation)
-            self.transform.transforms.append(transforms.Lambda(
-                        lambda x: x[:,self.permutation]  # Fixed permutation
-                    ))
+            self.transform.transforms.append(
+                transforms.Lambda(lambda x: x[:, self.permutation])  # Fixed permutation
+            )
 
     def _yaml_parameters(self):
         hidden_channels = self.cfg.net.hidden_channels
 
         OmegaConf.update(self.cfg, "train.batch_size", 100)
-        OmegaConf.update(self.cfg, "train.epochs", 136)
+        OmegaConf.update(self.cfg, "train.epochs", 170)
         OmegaConf.update(self.cfg, "net.in_channels", 1)
         OmegaConf.update(self.cfg, "net.out_channels", 10)
         OmegaConf.update(self.cfg, "net.data_dim", 1)
@@ -117,13 +118,12 @@ class MnistDataModule(pl.LightningDataModule):
             [FULL_TRAIN_SIZE, FULL_VAL_SIZE],
             generator=self.generator,
         )
-            
+
         mnist_train, mnist_val = mnist_train_full, mnist_val_full
 
         print(f"Training set size: {len(mnist_train)}")
         print(f"Validation set size: {len(mnist_val)}")
         return mnist_train, mnist_val
-
 
     def train_dataloader(self):
         return DataLoader(
@@ -131,7 +131,7 @@ class MnistDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=True,
-            generator=self.generator
+            generator=self.generator,
         )
 
     def val_dataloader(self):
@@ -139,7 +139,7 @@ class MnistDataModule(pl.LightningDataModule):
             self.mnist_val,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            shuffle=False
+            shuffle=False,
         )
 
     def test_dataloader(self):
@@ -147,7 +147,7 @@ class MnistDataModule(pl.LightningDataModule):
             self.mnist_test,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            shuffle=False
+            shuffle=False,
         )
 
     def predict_dataloader(self):
@@ -155,7 +155,7 @@ class MnistDataModule(pl.LightningDataModule):
             self.mnist_predict,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            shuffle=False
+            shuffle=False,
         )
 
     def show_samples(self, num_samples: int = 5):
@@ -163,8 +163,13 @@ class MnistDataModule(pl.LightningDataModule):
         for i in range(num_samples):
             image, label = dataset[i]
             # Create the plot
-            plt.figure(figsize=(10,10))  # Wide plot to fit 784 pixels
-            plt.plot(image, marker='o', markersize=20, linestyle='-',)
+            plt.figure(figsize=(10, 10))  # Wide plot to fit 784 pixels
+            plt.plot(
+                image,
+                marker="o",
+                markersize=20,
+                linestyle="-",
+            )
 
             # Add title and labels
             plt.title(f"Flattened Image of Label: {label}")

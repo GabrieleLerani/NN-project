@@ -5,7 +5,7 @@ net:
   hidden_channels: 140
   no_blocks: 4
   bias: True
-  causal: True
+  causal: False
 
 kernel:
   kernel_no_layers: 3
@@ -16,7 +16,7 @@ kernel:
   omega_0: 
 
 load_model:
-  pre_trained: False
+  pre_trained: True
   model: "top"
 
 train:
@@ -37,7 +37,7 @@ train:
 
 data:
   data_dir : "datasets"
-  dataset : "listops"
+  dataset : "s_pathfinder"
   # this line is used only in datamodules that uses LRA as dataset (pathfinder, listops, etc.)
   light_lra: False
 
