@@ -39,6 +39,4 @@
 #### **data:**
 - `data_dir`: Directory where datasets are stored.
 - `dataset`: Dataset being used, refer to [DATAMODULES.md](datamodules/DATAMODULES.md) for more details.
-- `type`: Type of data being used.
-- `reduced_dataset`: Whether to use a reduced version of the dataset.
 - `light_lra`: Used only with Long Range Arena (LRA) datasets.
