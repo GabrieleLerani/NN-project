@@ -46,7 +46,6 @@ class MnistDataModule(pl.LightningDataModule):
             self.permutation = (
                 self._generate_permutation()
             )  # Generate a fixed permutation
-            print(self.permutation)
             self.transform.transforms.append(
                 transforms.Lambda(lambda x: x[:, self.permutation])  # Fixed permutation
             )
