@@ -27,4 +27,4 @@ This directory contains the collection of dataset that can be used for various t
 
 - **s_image**: A sequential version of the general image dataset, allowing images to be processed as a sequence of pixels or patches, suitable for sequence models.
 
-- **text**: A text-based dataset, it includes reviews and the model has to understand if it is a good one or not.
+- **text**: A text-based dataset, it includes reviews and the model has to understand if it is a positive one or not.
