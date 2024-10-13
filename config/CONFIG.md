@@ -7,7 +7,6 @@
 - `hidden_channels`: Number of hidden channels in the layers.
 - `no_blocks`: Number of blocks in the model.
 - `bias`: Whether to include bias terms in the layers.
-- `block_type`: Type of block used (e.g., `s4` for a specific variant).
 
 #### **kernel:**
 - `kernel_no_layers`: Number of layers in the kernel.
@@ -36,10 +35,6 @@
 - `dropout_rate`: Dropout rate for regularization.
 - `weight_decay`: Weight decay for L2 regularization.
 - `max_epoch_no_improvement`: Early stopping after a specified number of epochs without improvement.
-
-#### **test:**
-- `epochs`: Number of epochs for testing.
-- `batch_size`: Batch size used during testing.
 
 #### **data:**
 - `data_dir`: Directory where datasets are stored.
