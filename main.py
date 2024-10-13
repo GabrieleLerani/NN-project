@@ -122,12 +122,7 @@ def create_trainer(
     callbacks: list,
     profiler: PyTorchProfiler,
 ) -> pl.Trainer:
-    # Ensure ModelCheckpoint is in the callbacks
-    if not any(isinstance(cb, ModelCheckpoint) for cb in callbacks):
-        raise ValueError(
-            "ModelCheckpoint callback must be included in the callbacks list."
-        )
-
+    
     return pl.Trainer(
         logger=logger,
         accelerator=cfg.train.accelerator,
