@@ -147,9 +147,7 @@ class PathfinderDataModule(pl.LightningDataModule):
         self.num_workers = 0
 
         self._yaml_parameters()
-        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(
-            42
-        )
+        self.generator = torch.Generator(device=self.cfg.train.accelerator).manual_seed(42)
 
     def prepare_data(self):
         # download and extract only if the light lra version is not used
@@ -163,7 +161,6 @@ class PathfinderDataModule(pl.LightningDataModule):
                 self._extract_lra_release()
 
             else:
-                # self._extract_lra_release()
                 print("Zip already downloaded. Skipping download.")
 
     def _download_lra_release(self):
@@ -312,19 +309,3 @@ class PathfinderDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
         )
         return test_dataloader
-
-
-if __name__ == "__main__":
-
-    # torch.set_default_device("mps")
-    # prompt: Generate the code to instantiate PathFinderDataModule
-
-    cfg = OmegaConf.load("config/config.yaml")
-    dm = PathfinderDataModule(cfg=cfg)
-    dm.prepare_data()
-    dm.setup("fit")
-    train_loader = dm.train_dataloader()
-
-    for x, y in train_loader:
-        print(f"Batch of images shape: {x.shape} {y.shape}")
-        break
