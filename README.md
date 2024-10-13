@@ -140,9 +140,9 @@ When running the `main.py` script, the user can pass the following parameters to
 All the training parameters not explicetely defined are replaced with the optimal hyperparameters suggested in the original paper:
 ![Screenshot from 2024-09-14 16-32-02](https://github.com/user-attachments/assets/9cf6573b-0781-40bc-ab0c-5a9ca3a0b7e8)
 
-#### Example 1: train the model with four s4 blocks, a hidden channel size of 140, and kernel size of 33 on sequential mnist using gpu
+#### Example 1: train the model with four s4 blocks, a hidden channel size of 140, and kernel size of 33 on sequential mnist using gpu:
    ```
-   python main.py data.dataset=smnist train.accelerator=gpu net.hidden_channels=140 net.no_blocks=4 kernel.kernel_size=33
+   python main.py data.dataset=s_mnist train.accelerator=cpu net.hidden_channels=140 net.no_blocks=4 kernel.kernel_size=33
    ```
 #### Example 2: disable logger and callbacks, if you don't want early stopping and TensorBoard logging:
    ```
