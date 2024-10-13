@@ -1,3 +1,5 @@
+mode: "train" # or train
+
 net:
   data_dim: 
   in_channels: 

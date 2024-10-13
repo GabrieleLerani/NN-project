@@ -32,10 +32,17 @@ def main(cfg: OmegaConf) -> None:
     model = create_model(cfg)
     # 3. Create the logger, callbacks, profiler and trainer
     logger, callbacks, profiler = setup_trainer_components(cfg)
-    trainer = create_trainer(cfg, logger, callbacks, profiler)
+    
 
     # 4. Train the model or use a pretrained one
-    train(cfg, trainer, model, datamodule)
+    if cfg.mode == "train":
+        trainer = create_trainer(cfg, logger, callbacks, profiler, epochs=cfg.train.epochs)
+        train(cfg, trainer, model, datamodule)
+    else:
+        datamodule.prepare_data()
+        datamodule.setup("test")
+        trainer = create_trainer(cfg, logger, callbacks, profiler, epochs=get_epoch_from_path(get_checkpoint_path(cfg)))
+        test(cfg, trainer, model, datamodule)
 
 
 def create_model(cfg: OmegaConf) -> CCNN:
@@ -116,24 +123,19 @@ def setup_trainer_components(cfg: OmegaConf):
     return logger, callbacks, profiler
 
 
-def create_trainer(
-    cfg: OmegaConf,
-    logger: TensorBoardLogger,
-    callbacks: list,
-    profiler: PyTorchProfiler,
-) -> pl.Trainer:
-    
+def create_trainer(cfg: OmegaConf, logger: TensorBoardLogger, callbacks: list, profiler: PyTorchProfiler, epochs: int) -> pl.Trainer:
     return pl.Trainer(
         logger=logger,
         accelerator=cfg.train.accelerator,
         devices=cfg.train.devices,
-        max_epochs=cfg.train.epochs,
+        max_epochs=epochs,
         callbacks=callbacks,
-        profiler=profiler,
+        gradient_clip_val=0.5,
     )
 
 
 def train(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:
+    
     # Start new training
     if not cfg.load_model.pre_trained or not exists_checkpoint_path(cfg):
         trainer.fit(model=model, datamodule=datamodule)
@@ -146,6 +148,19 @@ def train(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:
     trainer.validate(model=model, datamodule=datamodule, ckpt_path=get_checkpoint_path(cfg))
     trainer.test(model=model, datamodule=datamodule, ckpt_path=get_checkpoint_path(cfg))
 
+
+def test(cfg: OmegaConf, trainer: pl.Trainer, model: CCNN, datamodule) -> None:
+    OmegaConf.update(cfg, "load_model.model", "top")
+    trainer.fit(model=model, datamodule=datamodule, ckpt_path=get_checkpoint_path(cfg))
+    trainer.test(model=model, datamodule=datamodule, ckpt_path=get_checkpoint_path(cfg))
+
+def get_epoch_from_path(path: str) -> int:
+    import re
+
+    match = re.search(r"epoch=(\d+)", path)
+    if match:
+        epoch_number = int(match.group(1))
+        return epoch_number
 
 def get_checkpoint_path(cfg: OmegaConf) -> str:
     filename = f"{cfg.data.dataset}_{cfg.net.no_blocks}_{cfg.net.hidden_channels}"
