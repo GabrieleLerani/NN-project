@@ -1,3 +1,2 @@
 ## Overview
-
-This folder should contain the notebooks used for the ease the presentation
+This folder contains the notebook to help understanding the architecture and the code to execute it.
