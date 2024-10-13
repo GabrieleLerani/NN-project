@@ -92,11 +92,17 @@ When running the `main.py` script, the user can pass the following parameters to
 All the training parameters not explicetely defined are replaced with the optimal hyperparameters suggested in the original paper:
 ![Screenshot from 2024-09-14 16-32-02](https://github.com/user-attachments/assets/9cf6573b-0781-40bc-ab0c-5a9ca3a0b7e8)
 
-#### Example 1: train the model with four s4 blocks, a hidden channel size of 140, and kernel size of 33 on sequential mnist using gpu:
+During training, checkpoints are automatically saved into `checkpoints/` (created if it does not already exist) indeed pytorch_lightning allows to save the last or the best one.
+
+#### Example 1: train the model with four s4 blocks, 140 hidden channels, and kernel size of 33 on sequential mnist using gpu:
    ```
    python main.py data.dataset=s_mnist train.accelerator=cpu net.hidden_channels=140 net.no_blocks=4 kernel.kernel_size=33
    ```
-#### Example 2: disable logger and callbacks, if you don't want early stopping and TensorBoard logging:
+#### Example 2: start training from the top checkpoint of SMNIST:
+   ```
+   python main.py data.dataset=s_mnist train.accelerator=cpu net.hidden_channels=140 net.no_blocks=4 kernel.kernel_size=33 load_model.pre_trained=True load_model.model=top
+   ```
+#### Example 3: disable logger and callbacks, if you don't want early stopping and TensorBoard logging:
    ```
    python main.py data.dataset=cifar10 train.logger=False train.callbacks=False
    ```
