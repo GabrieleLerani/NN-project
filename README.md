@@ -106,6 +106,10 @@ During training, checkpoints are automatically saved into `checkpoints/` (create
    ```
    python main.py data.dataset=cifar10 train.logger=False train.callbacks=False
    ```
+#### Example 4: run an epoch on test dataset. It works only if a checkpoint already exists (by default it loads the best one):
+   ```
+   python main.py data.dataset=p_mnist mode=test
+   ```
 
 ## :clap: Aknowledgments
 We really thank the authors of the original work
