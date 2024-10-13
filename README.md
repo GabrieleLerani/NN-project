@@ -7,7 +7,7 @@ This repository contains a PyTorch implementation of the Continuous Convolutiona
 - Handles data of arbitrary resolution, dimensionality, and length without the need for task-specific architectures.
 - Models long-range dependencies efficiently at every layer using continuous kernels.
 - Supports both sequential (1D) and visual (2D) data.
-- Works with irregularly-sampled data and test-time resolution changes.
+- Works with irregularly-sampled data.
 
 ## :file_folder: Repository structure
 ```
@@ -36,7 +36,7 @@ NN-project
 - <img src="https://github.com/user-attachments/assets/953f0cdb-0047-4ae1-8a15-920e3f17b269" alt="Lightning Logo" width="20">**PyTorch Lightning**: Used to reduce the boilerplate code required for training and to structure the training loop in a cleaner, more manageable way.
   
 - <img src="https://github.com/user-attachments/assets/0c30078f-adab-4a04-bf91-0011e3fa6737" alt="Tensorboard Logo" width="20"> **Tensorborad**: Used to easily visualize and track metrics improvement during training.
-- <img src="https://github.com/user-attachments/assets/f1865c35-13c1-4b22-b6d7-c8ec75e313da" alt="Hydra Logo" width="20"> **Hydra**: The `config.yaml` file is managed using OmegaConf, which allows for flexible and hierarchical configuration management.
+- <img src="https://github.com/user-attachments/assets/f1865c35-13c1-4b22-b6d7-c8ec75e313da" alt="Hydra Logo" width="20"> **Hydra**: The [`config.yaml`](config/config.yaml) file is managed using OmegaConf, which allows for flexible and hierarchical configuration management.
   
 ## :orange_book: Note on training and dataset
 Since our limited hardware resources we trained the model using the VM of **Google Colab** with a **T4 GPU, 12 GB RAM, 100 GB on disk**. It allowed us to test on 1D and 2D dataset but it has been not enough for multi dimensional data which requires more power and memory.
@@ -65,7 +65,7 @@ We are using a **light version of the Long Range Arena (LRA)** dataset due to me
    pip install -r requirements.txt
    ```
 ## :clipboard: Configuration file
-   The `config.yaml` file contains the configuration settings for building, training, and testing the neural network model. The file is split into different sections to handle specific parts of the model.
+   The [`config.yaml`](config/config.yaml) file contains the configuration settings for building, training, and testing the neural network model. The file is split into different sections to handle specific parts of the model.
 
 - **net:** Defines the architecture of the neural network, including the number of layers, channels, and the type of block used.
 - **kernel:** Configures kernel layers, sizes, and convolution types.
@@ -75,58 +75,10 @@ We are using a **light version of the Long Range Arena (LRA)** dataset due to me
 - **data:** Provides details about the dataset being used and where it is located.
 - **hydra:** Handles the logging and directory management for Hydra, the configuration manager.
 
-### Parameters Description
-
-#### **net:**
-- `data_dim`: Dimensionality of the input data.
-- `in_channels`: Number of input channels.
-- `out_channels`: Number of output channels (typically for classification tasks).
-- `hidden_channels`: Number of hidden channels in the layers.
-- `no_blocks`: Number of blocks in the model.
-- `bias`: Whether to include bias terms in the layers.
-- `block_type`: Type of block used (e.g., `s4` for a specific variant).
-
-#### **kernel:**
-- `kernel_no_layers`: Number of layers in the kernel.
-- `kernel_hidden_channels`: Number of hidden channels in the kernel layers.
-- `kernel_size`: Size of the kernel in the convolution operation.
-- `conv_type`: Type of convolution (`conv` for standard convolution).
-- `fft_threshold`: Threshold for Fast Fourier Transform (used in some layers).
-- `omega_0`: A parameter for initialization in some kernel layers.
-
-#### **load_model:**
-- `pre_trained`: Whether to load a pre-trained model.
-- `model`: Which model to load (e.g., "last" refers to the last saved model).
-
-#### **train:**
-- `logger`: Enable or disable logging during training.
-- `callbacks`: Enable or disable callbacks (e.g., early stopping, checkpoints).
-- `profiler`: Enable or disable profiling to monitor performance.
-- `accelerator`: Defines which accelerator to use (`cpu`, `gpu`, etc.).
-- `devices`: Specifies the number of devices to use (set to "auto" for automatic selection).
-- `warmup_epochs`: Number of warmup epochs (gradual learning rate increase).
-- `epochs`: Total number of epochs for training.
-- `learning_rate`: Learning rate for the optimizer.
-- `batch_size`: Batch size used during training.
-- `start_factor`: Initial learning rate multiplier.
-- `end_factor`: Final learning rate multiplier.
-- `dropout_rate`: Dropout rate for regularization.
-- `weight_decay`: Weight decay for L2 regularization.
-- `max_epoch_no_improvement`: Early stopping after a specified number of epochs without improvement.
-
-#### **test:**
-- `epochs`: Number of epochs for testing.
-- `batch_size`: Batch size used during testing.
-
-#### **data:**
-- `data_dir`: Directory where datasets are stored.
-- `dataset`: Dataset being used, refer to [DATAMODULES.md](datamodules/DATAMODULES.md) for more details.
-- `type`: Type of data being used.
-- `reduced_dataset`: Whether to use a reduced version of the dataset.
-- `light_lra`: Used only with Long Range Arena (LRA) datasets.
+Refer to [CONFIG.md](config/CONFIG.md) for a complete description of the parameters.
    
 ### Examples
-When running the `main.py` script, the user can pass the following parameters to override their default values in the `config.yaml`. 
+When running the `main.py` script, the user can pass the following parameters to override their default values in the [`config.yaml`](config/config.yaml). 
 - `kernel_no_layers`: Number of layers in the kernel.
 - `kernel_hidden_channels`: Number of hidden channels in the kernel layers.
 - `kernel_size`: Size of the kernel in the convolution.
