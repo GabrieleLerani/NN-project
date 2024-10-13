@@ -1,5 +1,5 @@
 ## Parameters Description
-
+- `mode`: Can be "train" or "test". The latter works only if a checkpoint already exists.
 #### **net:**
 - `data_dim`: Dimensionality of the input data.
 - `in_channels`: Number of input channels.
@@ -7,12 +7,13 @@
 - `hidden_channels`: Number of hidden channels in the layers.
 - `no_blocks`: Number of blocks in the model.
 - `bias`: Whether to include bias terms in the layers.
+- `causal`: Whether to have causal convolutions (only for 1D data).
 
 #### **kernel:**
 - `kernel_no_layers`: Number of layers in the kernel.
 - `kernel_hidden_channels`: Number of hidden channels in the kernel layers.
 - `kernel_size`: Size of the kernel in the convolution operation.
-- `conv_type`: Type of convolution (`conv` for standard convolution).
+- `conv_type`: Type of convolution (`conv` for standard convolution or `fftconv`).
 - `fft_threshold`: Threshold for Fast Fourier Transform (used in some layers).
 - `omega_0`: A parameter for initialization in some kernel layers.
 
